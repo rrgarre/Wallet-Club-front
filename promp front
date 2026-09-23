@@ -1,0 +1,23 @@
+atendiendo al contrato de api alojado en esta carpeta.
+Es una api de nuestro control y propiedad.
+
+Necesito un front hecho en react
+
+como debe ser.
+1-Vamos a crear una SPA simplememte para que el admin pueda tener control de todo y teseteo.
+Con login de tarjeta, comercio o admin
+Segun con quien logeas se puede acceder a una info u otra.
+Registros de admin, comercio y tarjeta
+
+2-Y por otro lado necesito la parte que realmente será accesible por nuestros clientes.
+-una web de login de comercio con la info que el comercia pueda ver
+-otra web de comercio que en la url venga el código de tarjeta(dejame preparada un parametro en la url y yo me encargo de tocarlo en navegador) para poder modificar los contadores de esta tarjeta siempre que pertenezca al comercio logeado.
+Aquí reside la complegidad:
+debe verse la tarjeta pero sobre todo necesito en grande ver los puntos y posibles premios generados si los hay.
+Poder sumar puntos de 1 en 1 o con entrada, pero minimalista.
+Si sumo puntos y estos alcanzan al valor fijado en comercio de puntosPremio, el contador debe restar tantos puntos necesarios para el premio y sumar un premio. (Pero esto sólo será visual en el cliente, ya que aunque superemos, el paquete que enviamos al servidor es solamente la suma de puntos, y el server es el que vuelve a realizar esta cuenta)
+En cambio, si el usuario suma o resta premio manualmente, esto si se reflejara de forma literal en el paquete de data que se envia al server.
+El campo nombre debe ir vacio y oculto en el formulario, excepto si:
+el valor de premio es modificado manualmente, si la cantidad de puntos se introduce valor negativo, o si la suma de puntos añadidos supera o iguala 5. en estos casos se muestra el campo para nombre y se vuelve requerido.
+-otra vez separada para acceso de tarjetas, con su info
+-y necesito otra para registro de tarjetas, esta llevará un código como parametro que identifica al comercio (claverandomlarga) para que vaya incrustada en el formulario de registro sin posibilidad de manipular (de momento podemos generar esta web y yo introduzco el parametro correcto en el navegador, deja uno por defecto aunque no corresponda con la id larga de ningun comercio)
