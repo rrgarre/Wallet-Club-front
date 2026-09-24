@@ -40,6 +40,7 @@ Según con quién entres, te manda a tu zona (y cada zona protege su rol).
 | `/admin/comercios` | Listado, alta (`POST`) y edición (`PATCH`), copia del `idRandomLargo` y del enlace/QR de alta |
 | `/admin/tarjetas` | Listado global filtrable por comercio, detalle + historial (sólo lectura: el contrato no permite editar tarjetas) |
 | `/admin/operaciones` | Buscador con filtros (comercio, tarjeta, tipo, desde/hasta) y paginación |
+| `/admin/google-wallet` | **Alta de clase en Google Wallet** (`POST /api/admin/comercios/:idRandomLargo/google-wallet/clase`): selector de comercio, URLs https, color, términos y `reviewStatus` en desplegable; muestra el `clase.id` devuelto o el aviso del error |
 | `/admin/alta-tarjeta` | Alta de cliente eligiendo comercio (usa el endpoint público con su código) |
 | `/admin/registro-admin` | **Aviso**: el contrato v1.0 no tiene endpoint de alta de administradores |
 | `/admin/testeo` | Consola: `GET /health` y movimiento con todos los parámetros, mostrando la respuesta JSON cruda |
@@ -113,6 +114,11 @@ apunta dentro de la propia zona (p. ej. llegar al login desde
   servidor ni registro de admins: esas acciones **no están implementadas**.
 - Un `404 TARJETA_NOT_FOUND` significa «no existe o no es de tu comercio»: la
   interfaz no distingue ambos casos (como pide el contrato).
+- **Google Wallet (contrato v1.1)**: sólo existe el alta de clase. Si se
+  reenvía el formulario, el `409 GOOGLE_CLASE_YA_EXISTE` se pinta como aviso
+  (con el `message` de la API) y **no** se reintenta en bucle; los `5xx`
+  (`GOOGLE_WALLET_PERMISOS/AUTH/SIN_CONFIG/INDISPONIBLE`) se marcan como
+  problema del servidor, y sólo `INDISPONIBLE` ofrece botón de reintento.
 - El umbral de `nombre` del cliente (≥ 5 puntos) puede ser menor que el del
   servidor (`UMBRAL_PUNTOS_NOMBRE`, 100 por defecto): por eso el reenvío con la
   misma idempotencia está contemplado.

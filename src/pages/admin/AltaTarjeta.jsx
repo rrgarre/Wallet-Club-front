@@ -9,7 +9,6 @@ export default function AltaTarjeta() {
   const prefijo = params.get('comercioId') || '';
   const [comercios, setComercios] = useState(null);
   const [error, setError] = useState(null);
-  const [hecho, setHecho] = useState(null);
 
   useEffect(() => {
     api('/api/admin/comercios')
@@ -57,13 +56,10 @@ export default function AltaTarjeta() {
       </div>
 
       <div className="tarjeta ancho-medio">
-        {hecho ? (
-          <Aviso tipo="ok">
-            Tarjeta «{hecho.nombre}» creada en {hecho.comercio?.nombre} (id {hecho.usuario?.id}).
-          </Aviso>
-        ) : comercio ? (
+        {comercio ? (
           <>
-            <FormRegistro idRandomLargo={comercio.idRandomLargo} onRegistrado={setHecho} />
+            {/* key: al cambiar de comercio se reinicia el formulario y su estado de éxito */}
+            <FormRegistro key={comercio.idRandomLargo} idRandomLargo={comercio.idRandomLargo} />
             <p className="muted small">
               Nota: al registrarse se emite un token de tarjeta; aquí no se guarda para no pisar tu sesión de admin.
             </p>

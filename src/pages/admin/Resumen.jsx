@@ -76,6 +76,9 @@ export default function Resumen() {
           <Link className="chip" to="/admin/operaciones">
             Buscar operaciones
           </Link>
+          <Link className="chip" to="/admin/google-wallet">
+            Google Wallet · alta de clase
+          </Link>
           <Link className="chip" to="/admin/testeo">
             Consola de testeo
           </Link>

@@ -6,6 +6,7 @@ const MENU = [
   { to: '/admin/comercios', txt: 'Comercios' },
   { to: '/admin/tarjetas', txt: 'Tarjetas' },
   { to: '/admin/operaciones', txt: 'Operaciones' },
+  { to: '/admin/google-wallet', txt: 'Google Wallet' },
   { to: '/admin/alta-tarjeta', txt: 'Alta de tarjeta' },
   { to: '/admin/registro-admin', txt: 'Registro admin' },
   { to: '/admin/testeo', txt: 'Testeo' },

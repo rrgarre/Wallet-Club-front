@@ -8,6 +8,7 @@ import AdminResumen from './pages/admin/Resumen.jsx';
 import AdminComercios from './pages/admin/Comercios.jsx';
 import AdminTarjetas from './pages/admin/Tarjetas.jsx';
 import AdminOperaciones from './pages/admin/Operaciones.jsx';
+import AdminGoogleWallet from './pages/admin/GoogleWallet.jsx';
 import AdminAltaTarjeta from './pages/admin/AltaTarjeta.jsx';
 import AdminRegistroAdmin from './pages/admin/RegistroAdmin.jsx';
 import AdminTesteo from './pages/admin/Testeo.jsx';
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="comercios" element={<AdminComercios />} />
         <Route path="tarjetas" element={<AdminTarjetas />} />
         <Route path="operaciones" element={<AdminOperaciones />} />
+        <Route path="google-wallet" element={<AdminGoogleWallet />} />
         <Route path="alta-tarjeta" element={<AdminAltaTarjeta />} />
         <Route path="registro-admin" element={<AdminRegistroAdmin />} />
         <Route path="testeo" element={<AdminTesteo />} />

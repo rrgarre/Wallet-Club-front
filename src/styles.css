@@ -105,6 +105,34 @@ select.input { cursor: pointer; }
 .input.corto { width: 92px; text-align: center; }
 .casilla { display: flex; align-items: center; gap: 8px; font-size: 14px; }
 .form-pie { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+textarea.input { min-height: 92px; resize: vertical; line-height: 1.45; }
+.fila-color { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.input.color { width: 54px; height: 38px; padding: 3px; cursor: pointer; }
+.input.color:disabled { opacity: 0.35; cursor: not-allowed; }
+.resultado-clase { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+
+/* Alta de tarjeta correcta: enlace a Google Wallet */
+.alta-exito { display: flex; flex-direction: column; gap: 12px; }
+.btn-wallet {
+  justify-content: center;
+  background: #000;
+  border-color: #000;
+  color: #fff;
+  font-weight: 600;
+  padding: 12px 16px;
+  font-size: 15.5px;
+}
+.btn-wallet:hover { background: #1d1d1d; }
+.wallet-icono {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  color: #000;
+  font-weight: 800;
+}
 
 /* ───────────────────────── Avisos ───────────────────────── */
 .aviso {

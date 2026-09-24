@@ -47,18 +47,32 @@ export default function Registro() {
 
 /**
  * Formulario de alta reutilizado por la ruta pública y por el panel de admin.
- * - `onRegistrado(datos)` recibe la respuesta completa del endpoint.
- * - `redirigir` = la ruta pública loguea al nuevo cliente y le manda a su zona.
+ * - `onRegistrado(respuesta)` recibe la respuesta completa del endpoint.
+ * - `redirigir` = la ruta pública loguea al nuevo cliente (sin salir todavía
+ *   de esta pantalla, para poder enseñar el enlace de Google Wallet).
+ *
+ * El backend devuelve `googleWalletUrl` tras el alta: es el enlace con el que
+ * el cliente registra la tarjeta en su Wallet.
  */
+export function urlWallet(res) {
+  return res?.googleWalletUrl || res?.usuario?.googleWalletUrl || res?.tarjeta?.googleWalletUrl || null;
+}
+
 export function FormRegistro({ idRandomLargo, onRegistrado, redirigir = false }) {
   const { registrarTarjeta, entrar } = useAuth();
   const navegar = useNavigate();
   const [f, setF] = useState({ nombre: '', email: '', password: '', repetir: '' });
   const [error, setError] = useState(null);
-  const [info, setInfo] = useState(null);
   const [enviando, setEnviando] = useState(false);
+  const [creado, setCreado] = useState(null); // respuesta del alta
 
   const set = (k, v) => setF((old) => ({ ...old, [k]: v }));
+
+  const reiniciar = () => {
+    setCreado(null);
+    setF({ nombre: '', email: '', password: '', repetir: '' });
+    setError(null);
+  };
 
   const enviar = async (e) => {
     e.preventDefault();
@@ -78,14 +92,10 @@ export function FormRegistro({ idRandomLargo, onRegistrado, redirigir = false })
         email: f.email.trim(),
         password: f.password,
       });
-      if (redirigir) {
-        entrar(res); // el alta devuelve token: se queda logueada
-        navegar('/tarjeta', { replace: true });
-      } else if (onRegistrado) {
-        onRegistrado(res);
-      }
+      if (redirigir) entrar(res); // alta con token: queda logueada, pero NO salimos todavía
+      setCreado(res);
+      if (onRegistrado) onRegistrado(res);
     } catch (err) {
-      setInfo(null);
       if (err.code === 'COMERCIO_NOT_FOUND') {
         setError('Ese código de comercio no existe. Comprueba el enlace o pide el QR correcto al comercio.');
       } else if (err.code === 'EMAIL_DUPLICADO') {
@@ -98,10 +108,56 @@ export function FormRegistro({ idRandomLargo, onRegistrado, redirigir = false })
     }
   };
 
+  /* ── Alta correcta: enseñar el enlace de Google Wallet ── */
+  if (creado) {
+    const wallet = urlWallet(creado);
+    return (
+      <div className="alta-exito">
+        <Aviso tipo="ok">
+          Tarjeta creada: <b>{creado.usuario?.nombre || f.nombre}</b>
+          {creado.comercio?.nombre ? (
+            <>
+              {' '}
+              en <b>{creado.comercio.nombre}</b>
+            </>
+          ) : null}
+          {creado.usuario?.id ? ` (id ${creado.usuario.id})` : ''}.
+        </Aviso>
+
+        {wallet ? (
+          <>
+            <a className="btn btn-wallet" href={wallet} target="_blank" rel="noopener noreferrer">
+              <span className="wallet-icono">＋</span> Añadir tarjeta a Google Wallet
+            </a>
+            <p className="muted small">
+              Se abrirá Google Wallet para que el cliente registre su tarjeta en el móvil.
+            </p>
+            <code className="codigo largo">{wallet}</code>
+          </>
+        ) : (
+          <p className="muted small">
+            El servidor no ha devuelto enlace de Google Wallet para esta tarjeta (campo <code>googleWalletUrl</code>).
+          </p>
+        )}
+
+        <div className="form-pie">
+          {redirigir ? (
+            <button className="btn btn-primario" onClick={() => navegar('/tarjeta', { replace: true })}>
+              Continuar a mi tarjeta →
+            </button>
+          ) : (
+            <button className="btn" onClick={reiniciar}>
+              Registrar otra tarjeta
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={enviar} className="form">
       <Aviso tipo="error">{error}</Aviso>
-      <Aviso tipo="info">{info}</Aviso>
       <Campo label="Nombre" requerido>
         <input className="input" value={f.nombre} onChange={(e) => set('nombre', e.target.value)} autoFocus />
       </Campo>
