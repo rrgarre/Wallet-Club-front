@@ -11,18 +11,18 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
-### Configuración de URLs (`src/config.js`)
+**No hay ficheros `.env`**: al clonar no hay nada que rellenar. La única
+configuración (la URL del servidor API) está a la vista en `src/config.js`.
 
-Todo se construye de forma dinámica desde `.env`, sin tocar código:
+### Configuración (`src/config.js`)
 
-| Variable | Uso | Ejemplos |
+| Constante | Valor por defecto | Cuándo tocarla |
 |---|---|---|
-| `VITE_FRONT_URL` | Base del front: enlaces y **QR** de captura/registro | `http://localhost:5173` (dev) · `https://test.…` · `https://…` |
-| `VITE_API_URL` | Base del API (contrato §1) | `http://localhost:3000` |
+| `API_BASE` | `http://localhost:3010` | Si el API corre en otro puerto o dominio. El contrato (§1) pone `http://localhost:3000`; se cambia esa línea y nada más. Justo debajo hay **una línea comentada** con el servidor remoto (`api.walletclub.ssl-alert`) para alternar commentando/descomentando |
+| `FRONT_BASE` | origen del navegador (`window.location.origin`) | Nunca: se calcula sola, así que sirve igual en dev, pruebas y producción |
 
-Si `VITE_FRONT_URL` está vacío se usa el **origen del navegador**, así que en
-cualquier entorno la URL sale correcta aunque no configures nada. Helpers:
-`capturaUrl(id)`, `capturaPath(id)`, `registroUrl(codigo)`, `registroPath(codigo)`.
+Helpers exportados: `capturaUrl(id)`, `capturaPath(id)`, `registroUrl(código)`,
+`registroPath(código)`.
 
 Producción: `npm run build` → carpeta `dist/` (el enrutado es *history*, el
 servidor debe servir `index.html` para cualquier `/ruta`).

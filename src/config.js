@@ -1,28 +1,36 @@
 /**
- * Configuración de URLs del proyecto.
+ * Configuración del proyecto — NO se usan ficheros .env.
  *
- * Todo se construye de forma dinámica a partir de las variables de entorno
- * (`.env`, `.env.local`, variables del despliegue…), de modo que el mismo
- * código sirve en desarrollo, pruebas y producción sin tocar código:
+ * Todo lo que hay que tocar al clonar o desplegar está aquí, a la vista:
  *
- *   VITE_FRONT_URL  → base del front (QR, enlaces de alta…)
- *                     Si no está definida se usa el origen del navegador,
- *                     que ya es correcto en cualquier entorno.
- *   VITE_API_URL    → base del API (contrato: http://localhost:3000 en dev)
+ *   · API_BASE  → URL del servidor API. Si tu API corre en otro puerto o
+ *                 dominio, se cambia UNA LÍNEA (no hay nada que rellenar a mano).
+ *   · FRONT_BASE→ no se toca nunca: se calcula del origen del navegador,
+ *                 así que sirve igual en desarrollo, pruebas y producción.
  */
 
+/** Deja la URL sin barras finales sobrantes. */
 const limpiar = (url) => (url || '').replace(/\/+$/, '');
 
-/** Base del front. Vacío en .env = origen dinámico del navegador. */
-export const FRONT_BASE = limpiar(import.meta.env.VITE_FRONT_URL) || window.location.origin;
+/**
+ * URL base del servidor API (contrato §1).
+ *
+ * Local: el API arranca con `PORT=3010` (ver Wallet-Club-API/.env).
+ * El contrato pone `http://localhost:3000` por defecto: si tu API corre ahí,
+ * cambia el valor de abajo y ya está.
+ */
+export const API_BASE = limpiar('http://localhost:3010') || 'http://localhost:3000';
+// ↓ Alternativa rápida: comenta la línea de arriba y descomenta esta para
+//   apuntar al servidor remoto (sólo puede estar activa una de las dos).
+// export const API_BASE = limpiar('https://api.walletclub.ssl-alert');
 
-/** Base del API. */
-export const API_BASE = limpiar(import.meta.env.VITE_API_URL) || 'http://localhost:3000';
+/** Base del front: origen dinámico del navegador (sin configurar). */
+export const FRONT_BASE = window.location.origin;
 
 /** Ruta (relativa) de la pantalla de captura de una tarjeta. */
 export const capturaPath = (tarjetaId) => `/comercio/captura/${tarjetaId}`;
 
-/** URL absoluta de captura: la que va dentro del QR de la tarjeta. */
+/** URL absoluta de captura: `FRONT_BASE` + la ruta anterior. */
 export const capturaUrl = (tarjetaId) => FRONT_BASE + capturaPath(tarjetaId);
 
 /** Ruta (relativa) del formulario de alta con el código del comercio. */
