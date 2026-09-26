@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Home, ExigirRol } from './components/guardas.jsx';
 
@@ -15,6 +16,9 @@ import AdminTesteo from './pages/admin/Testeo.jsx';
 
 import ComercioZona from './pages/comercio/Zona.jsx';
 import ComercioCaptura from './pages/comercio/Captura.jsx';
+// El lector de QR lleva su motor de decodificación (zxing): se carga sólo
+// cuando alguien entra en /comercio/escanear, para no engordar el bundle.
+const ComercioEscanear = lazy(() => import('./pages/comercio/Escanear.jsx'));
 
 import TarjetaZona from './pages/tarjeta/Zona.jsx';
 import RegistroTarjeta from './pages/tarjeta/Registro.jsx';
@@ -46,6 +50,15 @@ export default function App() {
 
       {/* 2a — Web del comercio: login + su información */}
       <Route path="/comercio" element={<ComercioZona />} />
+      {/* Escaneo del QR de tarjeta: pide login de comercio si hace falta */}
+      <Route
+        path="/comercio/escanear"
+        element={
+          <Suspense fallback={<p className="muted centro">Cargando lector de QR…</p>}>
+            <ComercioEscanear />
+          </Suspense>
+        }
+      />
       {/* 2b — Captura: el código de tarjeta viene en la URL */}
       <Route
         path="/comercio/captura/:codigo?"

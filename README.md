@@ -52,10 +52,28 @@ Según con quién entres, te manda a tu zona (y cada zona protege su rol).
 ### Comercio
 | Ruta | Contenido |
 |---|---|
-| `/comercio` | Login (por nombre o por `idRandomLargo`) + perfil del comercio + su lista de tarjetas. `?c=<codigo>` precarga el identificador (ideal para el QR) |
+| `/comercio` | Login (por nombre o por `idRandomLargo`) + perfil del comercio + su lista de tarjetas + **botones de acceso rápido** a *Escanear QR* y *Capturar puntos*. `?c=<codigo>` precarga el identificador (ideal para el QR) |
+| `/comercio/escanear` | **Lector de QR de tarjeta** (pide login de comercio si hace falta) |
 | `/comercio/captura/:codigo` | **Captura de puntos.** `:codigo` es el id de la tarjeta; también vale `/comercio/captura?tarjeta=<id>`. Sin código, muestra el selector de tarjetas |
 
 La API no expone el histórico de operaciones al comercio, sólo al admin.
+
+#### Lector de QR (`/comercio/escanear`)
+- **Los QR de las tarjetas ya no llevan la URL**: sólo contienen el
+  **identificador** numérico de la tarjeta.
+- Si no hay sesión se enseña el **login de comercio en la misma pantalla**; al
+  entrar se vuelve al lector (no manda a `/comercio`).
+- Botón **«Activar cámara»**: el navegador pide su permiso (`getUserMedia`).
+  Funciona en **Safari/iOS ≥ 15.1** y en **Chrome/Android** (usa `BarcodeDetector`
+  cuando existe y ZXing de respaldo). Fallos de permiso, cámara ocupada o
+  conexión no segura (HTTPS) se traducen a mensajes claros.
+- Al leer el QR se **construye la URL de captura** (`capturaPath(id)`, con la
+  constante del proyecto) y se abre nuestra pantalla de captura para editar los
+  puntos de esa tarjeta.
+- Tolera QRs antiguos que contengan la URL completa (`lib/qr.js`).
+- **Alternativa sin cámara**: campo manual «Número de tarjeta» + enlace al
+  selector de tarjetas. El lector se descarga aparte (`lazy`), no engorda el
+  bundle del resto de la web.
 
 #### Reglas de la captura (lo importante)
 - **Todo en grande**: contador de **puntos** y de **premios**, con el umbral
@@ -95,10 +113,13 @@ La API no expone el histórico de operaciones al comercio, sólo al admin.
 ### Tarjeta (cliente)
 | Ruta | Contenido |
 |---|---|
-| `/tarjeta` | Login (email + contraseña; si el email está en varios comercios pide el comercio) + saldo en grande + **QR grande de captura** (`FRONT_BASE/comercio/captura/<id>`, copiable) + historial propio |
+| `/tarjeta` | Login (email + contraseña; si el email está en varios comercios pide el comercio) + saldo en grande + **QR grande** que contiene **sólo el identificador** de la tarjeta (lo escanea el comercio) + historial propio |
 | `/tarjeta/registro/:idRandomLargo` | **Alta pública.** El código va en la URL y no se puede tocar desde el formulario. Sin parámetro usa `0000…0000` (48 ceros), que **no** corresponde a ningún comercio real. También acepta `?c=<codigo>` |
 
-El registro devuelve `token`: el cliente queda logueado automáticamente.
+El registro devuelve `token`: el cliente queda logueado automáticamente. Además
+**no navega enseguida**: se queda en la pantalla de éxito para enseñar el
+`googleWalletUrl` devuelto (botón «Añadir tarjeta a Google Wallet», que abre en
+pestaña nueva) y un botón para continuar a `/tarjeta`.
 
 ### Destino tras el login
 `/login` y los logins individuales mandan **admin → `/admin`,
@@ -130,8 +151,9 @@ src/
   api/client.js          fetch + JWT + errores {message, code}
   auth/AuthContext.jsx   sesión en localStorage (token, role, usuario)
   lib/util.js            uuid, simulación de saldo, regla de `nombre`
+  lib/qr.js              lectura del QR de tarjeta (sólo identificador)
   components/            logins, guardas de rol, tabla de operaciones, ui
   pages/admin/           SPA de administración
-  pages/comercio/        web del comercio + captura
+  pages/comercio/        web del comercio + captura + lector de QR
   pages/tarjeta/         web del cliente + registro
 ```

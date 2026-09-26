@@ -224,6 +224,11 @@ export default function Captura() {
           <p className="muted">
             La URL de captura lleva el código de la tarjeta: <code>{FRONT_BASE}{capturaPath('&lt;id de la tarjeta&gt;')}</code>
           </p>
+          <div className="chips">
+            <Link className="chip chip-escanear" to="/comercio/escanear">
+              📷 Escanear QR de la tarjeta
+            </Link>
+          </div>
           {!lista && <Cargando />}
           {lista && lista.length === 0 && <p className="muted">No tienes tarjetas todavía.</p>}
           {lista && lista.length > 0 && (
@@ -528,6 +533,9 @@ function Cuerpo({ children }) {
           <span>Captura de puntos</span>
         </div>
         <div className="barra-der">
+          <Link className="btn btn-mini" to="/comercio/escanear">
+            📷 Escanear QR
+          </Link>
           <Link className="btn btn-ghost btn-mini" to="/comercio">
             Mi comercio
           </Link>

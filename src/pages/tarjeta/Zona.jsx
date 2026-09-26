@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { api } from '../../api/client.js';
-import { capturaPath, capturaUrl } from '../../config.js';
+import { capturaPath } from '../../config.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import { ExigirRol } from '../../components/guardas.jsx';
 import { FormLoginTarjeta } from '../../components/logins.jsx';
@@ -104,26 +104,29 @@ function Panel() {
 
               <div className="qr-fila">
                 <div className="qr-caja">
-                  <QRCodeSVG value={capturaUrl(perfil.id)} size={236} level="M" marginSize={1} />
+                  {/* El QR sólo lleva el identificador de la tarjeta */}
+                  <QRCodeSVG value={String(perfil.id)} size={236} level="M" marginSize={1} />
                 </div>
                 <div className="qr-info">
-                  <b>QR de captura</b>
+                  <b>QR de la tarjeta</b>
                   <p className="muted small">
-                    Muéstralo al comercio: al escanearlo se abre directamente la pantalla para modificar los puntos de{' '}
-                    <b>esta</b> tarjeta.
+                    Muéstralo al comercio: su lector lee el identificador (<b>{perfil.id}</b>) y abre directamente la
+                    pantalla para modificar los puntos de <b>esta</b> tarjeta.
                   </p>
-                  <code className="codigo largo">{capturaUrl(perfil.id)}</code>
+                  <code className="codigo largo">Identificador: {perfil.id}</code>
                   <div className="fila-codigo">
                     <button
                       className="btn btn-mini"
                       onClick={async () =>
                         setAviso({
                           tipo: 'ok',
-                          texto: (await copiar(capturaUrl(perfil.id))) ? 'Enlace copiado.' : 'No se pudo copiar.',
+                          texto: (await copiar(String(perfil.id)))
+                            ? 'Identificador copiado.'
+                            : 'No se pudo copiar.',
                         })
                       }
                     >
-                      Copiar enlace
+                      Copiar identificador
                     </button>
                     <Link className="btn btn-mini" to={capturaPath(perfil.id)}>
                       Abrir captura

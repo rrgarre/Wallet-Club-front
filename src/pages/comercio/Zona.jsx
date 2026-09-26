@@ -31,6 +31,12 @@ function Publico() {
           </div>
         </div>
         <FormLoginComercio key={recargar} prefijo={prefijo} />
+        {/* Acceso directo al lector: si no hay sesión, allí se pedirá el login */}
+        <div className="accesos">
+          <Link className="acceso-grande" to="/comercio/escanear">
+            <span className="acceso-icono">📷</span> Escanear QR de tarjeta
+          </Link>
+        </div>
         <div className="enlaces-login">
           <Link to="/login">Acceso unificado</Link>
           <Link to="/tarjeta">Acceso de tarjeta</Link>
@@ -73,7 +79,10 @@ function Panel() {
           <span>Mi comercio</span>
         </div>
         <div className="barra-der">
-          <Link className="btn btn-primario btn-mini" to="/comercio/captura">
+          <Link className="btn btn-primario btn-mini" to="/comercio/escanear">
+            Escanear QR
+          </Link>
+          <Link className="btn btn-ghost btn-mini" to="/comercio/captura">
             Capturar puntos
           </Link>
           <button className="btn btn-ghost btn-mini" onClick={salir}>
@@ -88,6 +97,16 @@ function Panel() {
 
         {perfil && (
           <>
+            {/* Accesos rápidos: lector de QR y captura manual */}
+            <div className="accesos">
+              <Link className="acceso-grande" to="/comercio/escanear">
+                <span className="acceso-icono">📷</span> Escanear QR de tarjeta
+              </Link>
+              <Link className="acceso-grande secundario" to="/comercio/captura">
+                <span className="acceso-icono">✏️</span> Capturar puntos
+              </Link>
+            </div>
+
             <div className="tarjeta">
               <div className="perfil-comercio">
                 <div>

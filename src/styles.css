@@ -134,6 +134,46 @@ textarea.input { min-height: 92px; resize: vertical; line-height: 1.45; }
   font-weight: 800;
 }
 
+/* ─────────────── Lector de QR (comercio) ─────────────── */
+.contenedor-estrecho { max-width: 640px; }
+.lector { display: flex; flex-direction: column; gap: 14px; margin: 14px 0 4px; }
+.lector-caja {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  min-height: 300px;
+  background: #0b1220;
+  border-radius: 16px;
+  overflow: hidden;
+}
+/*
+ * El contenedor debe medir LO MISMO que el vídeo: html5-qrcode calcula con
+ * esas dimensiones el recuadro de lectura y el mapeo de píxeles del fotograma.
+ * Por eso no se fuerza ningún alto ni object-fit al vídeo.
+ */
+.lector-caja #lector-qr { position: relative; width: 100%; }
+.lector-caja video { display: block; }
+.lector-caja.apagada { background: repeating-linear-gradient(45deg, #0b1220, #0b1220 14px, #121b2e 14px, #121b2e 28px); }
+.lector-superpuesto {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 14px;
+  letter-spacing: 0.4px;
+  pointer-events: none;
+}
+.lector-controles { display: flex; flex-direction: column; gap: 8px; align-items: center; text-align: center; }
+.lector-controles .btn { min-width: 190px; }
+.divider { display: flex; align-items: center; gap: 12px; margin: 18px 0 14px; color: var(--texto-sus); font-size: 13px; }
+.divider::before,
+.divider::after { content: ''; flex: 1; height: 1px; background: var(--borde); }
+.fila-manual { display: flex; align-items: flex-end; gap: 10px; }
+.fila-manual .campo { flex: 1; }
+.chip-escanear { background: #eaf1ff; border-color: #c3d6ff; color: #1f6feb; font-weight: 600; }
+
 /* ───────────────────────── Avisos ───────────────────────── */
 .aviso {
   display: flex;
@@ -347,6 +387,33 @@ textarea.input { min-height: 92px; resize: vertical; line-height: 1.45; }
 .barra-izq, .barra-der { display: flex; align-items: center; gap: 10px; }
 .barra-sep { color: var(--texto-sus); }
 .contenedor { max-width: 1180px; margin: 0 auto; padding: 24px 20px 60px; }
+/* Accesos rápidos del comercio: lector de QR + captura manual */
+.accesos { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 0 18px; }
+.acceso-grande {
+  flex: 1 1 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  text-decoration: none;
+  font-size: 19px;
+  font-weight: 700;
+  padding: 16px 18px;
+  border-radius: 12px;
+  border: 1px solid var(--acento);
+  background: var(--acento);
+  color: #fff;
+  transition: background 0.12s, border-color 0.12s;
+}
+.acceso-grande:hover { background: var(--acento-osc); text-decoration: none; }
+.acceso-grande.secundario { background: var(--sup); border-color: var(--borde); color: var(--texto); }
+.acceso-grande.secundario:hover { background: #f1f4f9; }
+.acceso-icono { font-size: 22px; line-height: 1; }
+/* Dentro de la tarjeta de login van apilados y a todo el ancho */
+.tarjeta-login .accesos { flex-direction: column; }
+.tarjeta-login .acceso-grande { flex: 0 0 auto; font-size: 17px; padding: 13px 16px; }
+
 .perfil-comercio { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
 .perfil-comercio .rejilla { margin: 0; min-width: 300px; }
 .datos-tarjeta { gap: 10px; margin-bottom: 14px; }
