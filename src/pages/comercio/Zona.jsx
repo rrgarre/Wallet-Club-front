@@ -4,6 +4,7 @@ import { api } from '../../api/client.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import { ExigirRol } from '../../components/guardas.jsx';
 import { FormLoginComercio } from '../../components/logins.jsx';
+import { BotonInstalar } from '../../components/pwa.jsx';
 import { Aviso, Badge, Campo, Cargando } from '../../components/ui.jsx';
 import { copiar, fecha, urlRegistro } from '../../lib/util.js';
 
@@ -40,6 +41,7 @@ function Publico() {
         <div className="enlaces-login">
           <Link to="/login">Acceso unificado</Link>
           <Link to="/tarjeta">Acceso de tarjeta</Link>
+          <BotonInstalar className="btn btn-ghost btn-mini enlace-boton" />
         </div>
         <Aviso tipo="info">
           Si llegas desde el QR de tu comercio, añade <code>?c=TU_CODIGO_LARGO</code> a esta URL y el identificador

@@ -22,3 +22,11 @@
   RewriteCond %{REQUEST_URI} !^/assets/
   RewriteRule . /index.html [L]
 </IfModule>
+
+# PWA: el service worker y el manifest NUNCA se cachean en el CDN, si no,
+# los terminales no se enteran de que hay versión nueva del front.
+<IfModule mod_headers.c>
+  <FilesMatch "^(sw\.js|manifest\.webmanifest)$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+</IfModule>

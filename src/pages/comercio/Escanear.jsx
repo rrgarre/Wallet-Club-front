@@ -4,6 +4,7 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import { ExigirRol } from '../../components/guardas.jsx';
 import { FormLoginComercio } from '../../components/logins.jsx';
+import { BotonInstalar } from '../../components/pwa.jsx';
 import { Aviso, Campo } from '../../components/ui.jsx';
 import { capturaPath } from '../../config.js';
 import { extraerIdTarjeta } from '../../lib/qr.js';
@@ -59,6 +60,7 @@ function LoginRequerido() {
         <div className="enlaces-login">
           <Link to="/comercio">Mi comercio</Link>
           <Link to="/login">Acceso unificado</Link>
+          <BotonInstalar className="btn btn-ghost btn-mini enlace-boton" />
         </div>
         <Aviso tipo="info">
           Al entrar, volverás aquí con la cámara lista para escanear el QR de la tarjeta del cliente.
@@ -194,6 +196,7 @@ function Lector() {
           <span>Escanear QR</span>
         </div>
         <div className="barra-der">
+          <BotonInstalar etiqueta="Instalar app" />
           <Link className="btn btn-ghost btn-mini" to="/comercio">
             Mi comercio
           </Link>

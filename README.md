@@ -37,6 +37,50 @@ Si tu servidor no es Apache, crea su equivalente (Nginx
 `/* /index.html 200`, Vercel rewrites). Comprobación: `curl -I
 https://tu-dominio/comercio/escanear` debe dar `200`.
 
+### PWA (instalable en móviles y escritorio)
+
+El front se puede **instalar** desde el navegador: icono propio con el logo,
+abre en ventana aparte (sin barra) y **empieza en `/comercio/escanear`** (la
+pantalla de batalla de los camareros). Funciona en **Android/Chrome** e
+**iPhone/Safari**.
+
+| Pieza | Fichero |
+|---|---|
+| Iconos (fuente) | `scripts/gen-icons.mjs` → genera `public/icons/*` y `public/favicon.ico` desde un SVG propio |
+| Manifest + service worker | `vite.config.js` → `VitePWA` (plugin `vite-plugin-pwa`) |
+| Registro, aviso de versión y ayuda de instalación | `src/components/pwa.jsx` |
+| Metas iOS, favicon, `og:image` | `index.html` |
+| No cachear `sw.js`/`manifest` en el CDN | `public/.htaccess` |
+
+- **Regenerar iconos** (sólo si cambia la marca): `node scripts/gen-icons.mjs`.
+  Los PNG se versionan, no hace falta ejecutarlo al clonar.
+- **Build**: `npm run build` añade a `dist/` el `sw.js`, el
+  `manifest.webmanifest` y el `workbox-*.js`; precachea **18 entradas**
+  (HTML/JS/CSS/iconos ≈ 632 KiB).
+- **Qué se cachea**: sólo los ficheros estáticos de la app → abre al instante y
+  aguanta caídas breves del servidor. **Qué no: la API** (no hay
+  `runtimeCaching`), así que los puntos van siempre a la red y, sin conexión,
+  se ve el aviso de error en lugar de datos viejos.
+- **Actualizaciones**: con `registerType: 'prompt'`, al detectar versión nueva
+  aparece una barra *«Hay una versión nueva»* con botón **Recargar** (nunca
+  recarga sola en mitad de una captura). El `.htaccess` manda
+  `Cache-Control: no-cache` a `sw.js` y `manifest.webmanifest` para que esa
+  comisión llegue por el CDN.
+- **Instalación manual por plataforma**: botón **«Añadir a pantalla de
+  inicio»** en el lector y en el acceso de comercio → abre una ayuda con los
+  pasos de iPhone (Safari → Compartir), Android (Chrome → ⋮), Windows y Mac.
+- **Si el PWA falla o el móvil no es compatible**: la propia ayuda explica el
+  **acceso directo estándar** del navegador (crear acceso directo / arrastrar
+  la pestaña / marcador), que usa **el mismo logo** (`favicon.ico` +
+  `apple-touch-icon`).
+- **Límites de iPhone**: iOS no ofrece instalación automática (siempre desde
+  Safari) y puede purgar la caché si pasan 7 días sin abrir la app; el splash
+  de arranque es neutro.
+- **Comprobación**: `npm run preview` → `http://localhost:4173` (localhost
+  cuenta como seguro, el SW también funciona en local) → DevTools
+  *Application → Manifest / Service Workers*, o **Lighthouse → PWA**. En móvil:
+  instalar, y en modo avión la app debe abrir y dar error al confirmar.
+
 ---
 
 ## 1 · Administración (`/admin`)
@@ -164,8 +208,10 @@ src/
   auth/AuthContext.jsx   sesión en localStorage (token, role, usuario)
   lib/util.js            uuid, deviceId (id del dispositivo), simulación de saldo
   lib/qr.js              lectura del QR de tarjeta (sólo identificador)
-  components/            logins, guardas de rol, tabla de operaciones, ui
+  components/            logins, guardas de rol, tabla de operaciones, ui, pwa
   pages/admin/           SPA de administración
   pages/comercio/        web del comercio + captura + lector de QR
   pages/tarjeta/         web del cliente + registro
+scripts/
+  gen-icons.mjs          iconos de la PWA + favicon (node scripts/gen-icons.mjs)
 ```
