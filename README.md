@@ -43,7 +43,7 @@ Según con quién entres, te manda a tu zona (y cada zona protege su rol).
 | `/admin/google-wallet` | **Alta de clase en Google Wallet** (`POST /api/admin/comercios/:idRandomLargo/google-wallet/clase`): selector de comercio, URLs https, color, términos y `reviewStatus` en desplegable; muestra el `clase.id` devuelto o el aviso del error |
 | `/admin/alta-tarjeta` | Alta de cliente eligiendo comercio (usa el endpoint público con su código) |
 | `/admin/registro-admin` | **Aviso**: el contrato v1.0 no tiene endpoint de alta de administradores |
-| `/admin/testeo` | Consola: `GET /health` y movimiento con todos los parámetros, mostrando la respuesta JSON cruda |
+| `/admin/testeo` | Consola: `GET /health` y movimiento con todos los parámetros, mostrando lo enviado y la respuesta JSON cruda. En `nombre`, **vacío = se envía el `deviceId`** del navegador; escrito = se fuerza ese valor |
 
 ---
 
@@ -100,11 +100,12 @@ La API no expone el histórico de operaciones al comercio, sólo al admin.
   verdad**; el estado definitivo se lee de `tarjeta` de la respuesta (y de
   `conversion`, si la hay).
 - **Premios a mano**: `premiosDelta` sí va literal en el paquete.
-- **Campo `nombre`**: oculto y vacío por defecto. Aparece —y es obligatorio—
-  si el premio se modifica a mano, si los puntos van en negativo, o si la suma
-  de puntos añadidos es **≥ 5**. Si el servidor además reclama
-  `nombre`/`codigoCamarero`, se muestran los campos y **se reenvía con la misma
-  `Idempotency-Key`**.
+- **Sin campo `nombre`**: el formulario no lo tiene (ni oculto ni vacío). El
+  campo viaja **siempre** en el paquete y lo rellena el navegador con su
+  `deviceId`: UUID generado con `crypto.randomUUID()` la **primera** vez que se
+  usa y guardado en `localStorage` (no se regenera al hacer login ni al
+  recargar). Si el servidor reclama `codigoCamarero`, se muestra ese campo y
+  **se reenvía con la misma `Idempotency-Key`**.
 - **Idempotencia**: UUID generado al confirmar y reutilizado mientras los
   deltas no cambien (protege los reintentos por red).
 - **Sin atajos a otras tarjetas**: esta pantalla no muestra listado lateral de
@@ -140,9 +141,10 @@ apunta dentro de la propia zona (p. ej. llegar al login desde
   (con el `message` de la API) y **no** se reintenta en bucle; los `5xx`
   (`GOOGLE_WALLET_PERMISOS/AUTH/SIN_CONFIG/INDISPONIBLE`) se marcan como
   problema del servidor, y sólo `INDISPONIBLE` ofrece botón de reintento.
-- El umbral de `nombre` del cliente (≥ 5 puntos) puede ser menor que el del
-  servidor (`UMBRAL_PUNTOS_NOMBRE`, 100 por defecto): por eso el reenvío con la
-  misma idempotencia está contemplado.
+- El cliente ya no decide cuándo enviar `nombre`: **siempre** va con el
+  `deviceId`. Si el servidor rechaza una operación grande o en negativo pidiendo
+  `codigoCamarero` (`CODIGO_CAMARERO_REQUERIDO`), se muestra ese campo y el
+  reenvío se hace con la misma idempotencia.
 
 ## Estructura
 
@@ -150,7 +152,7 @@ apunta dentro de la propia zona (p. ej. llegar al login desde
 src/
   api/client.js          fetch + JWT + errores {message, code}
   auth/AuthContext.jsx   sesión en localStorage (token, role, usuario)
-  lib/util.js            uuid, simulación de saldo, regla de `nombre`
+  lib/util.js            uuid, deviceId (id del dispositivo), simulación de saldo
   lib/qr.js              lectura del QR de tarjeta (sólo identificador)
   components/            logins, guardas de rol, tabla de operaciones, ui
   pages/admin/           SPA de administración

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api } from '../../api/client.js';
 import { Aviso, Campo } from '../../components/ui.jsx';
-import { uuid } from '../../lib/util.js';
+import { deviceId, uuid } from '../../lib/util.js';
 
 const TIPOS = ['', 'acumulacion', 'canje', 'correccion', 'ajuste'];
 
@@ -43,7 +43,9 @@ export default function Testeo() {
     };
     if (f.tipo) body.tipo = f.tipo;
     if (f.descripcion) body.descripcion = f.descripcion;
-    if (f.nombre) body.nombre = f.nombre;
+    // Igual que en la captura normal: `nombre` SIEMPRE va y, salvo que se
+    // fuerce aquí, se rellena con el identificador del dispositivo.
+    body.nombre = f.nombre.trim() || deviceId();
     if (f.codigoCamarero) body.codigoCamarero = f.codigoCamarero;
     if (f.comercioId) body.comercioId = Number(f.comercioId);
 
@@ -54,10 +56,10 @@ export default function Testeo() {
         body,
         idempotencia: idem,
       });
-      setRespuesta({ peticion, ...res });
+      setRespuesta({ peticion, enviado: body, ...res });
       if (!f.idempotencia) set('idempotencia', idem); // reutilizar en reintentos
     } catch (err) {
-      setRespuesta({ peticion, error: err.message, code: err.code, status: err.status });
+      setRespuesta({ peticion, enviado: body, error: err.message, code: err.code, status: err.status });
     } finally {
       setEnviando(false);
     }
@@ -108,7 +110,10 @@ export default function Testeo() {
             <input className="input" value={f.descripcion} onChange={(e) => set('descripcion', e.target.value)} />
           </Campo>
           <div className="rejilla rejilla-2">
-            <Campo label="nombre" hint="Obligatorio en operaciones no estándar">
+            <Campo
+              label="nombre"
+              hint={`Vacío = se envía el identificador de este dispositivo (${deviceId()}). Escrito = se fuerza ese valor.`}
+            >
               <input className="input" value={f.nombre} onChange={(e) => set('nombre', e.target.value)} />
             </Campo>
             <Campo label="codigoCamarero">

@@ -11,17 +11,24 @@ export function uuid() {
 }
 
 /**
- * Umbral del cliente para exigir `nombre`:
- *  - premio modificado a mano (premiosDelta != 0)
- *  - puntos en negativo (puntosDelta < 0)
- *  - suma de puntos añadidos >= UMBRAL_NOMBRE
- * NOTA: el servidor tiene su propio umbral (UMBRAL_PUNTOS_NOMBRE, 100 por defecto);
- * si él también lo exige, el envío se repite con la misma idempotencia.
+ * Identificador del dispositivo/navegador.
+ *
+ * Es lo que viaja en el campo `nombre` de cada operación: un UUID que genera
+ * el navegador con `crypto.randomUUID()` la PRIMERA vez que se usa y se guarda
+ * en `localStorage` — no se regenera al hacer login ni al recargar la página.
  */
-export const UMBRAL_NOMBRE = 5;
-
-export function requiereNombre(puntosDelta, premiosDelta) {
-  return premiosDelta !== 0 || puntosDelta < 0 || puntosDelta >= UMBRAL_NOMBRE;
+export function deviceId() {
+  try {
+    let id = localStorage.getItem('deviceId');
+    if (!id) {
+      id = uuid();
+      localStorage.setItem('deviceId', id);
+    }
+    return id;
+  } catch {
+    // localStorage no disponible (modo privado, bloqueado…): id de esta sesión
+    return uuid();
+  }
 }
 
 /**

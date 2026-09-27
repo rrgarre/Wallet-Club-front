@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../../api/client.js';
 import { capturaPath, FRONT_BASE } from '../../config.js';
 import { Aviso, Cargando, MasOpciones } from '../../components/ui.jsx';
-import { requiereNombre, simularSaldo, uuid } from '../../lib/util.js';
+import { deviceId, simularSaldo, uuid } from '../../lib/util.js';
 
 /**
  * Captura de puntos.
@@ -18,9 +18,10 @@ import { requiereNombre, simularSaldo, uuid } from '../../lib/util.js';
  *  - El contador de la pantalla sí simula esa conversión para que el camarero
  *    vea el resultado al instante; el estado definitivo llega de `tarjeta`
  *    en la respuesta.
- *  - `nombre` está oculto y vacío salvo: premio modificado a mano, puntos en
- *    negativo, o suma de puntos añadidos >= 5. Si el servidor también lo pide
- *    (o pide codigoCamarero), se reenvía con la MISMA idempotencia.
+ *  - `nombre` NO es un campo del formulario: se envía SIEMPRE y se rellena
+ *    solo con el id del dispositivo/navegador (`deviceId()` de lib/util.js,
+ *    UUID guardado en localStorage). Si el servidor pide `codigoCamarero`,
+ *    se muestra ese campo y se reenvía con la MISMA idempotencia.
  *  - El cuadro de información está SIEMPRE visible, con altura reservada y a
  *    la altura de los botones: no aparece ni desplaza nada al sumar.
  */
@@ -41,10 +42,8 @@ export default function Captura() {
   const [cantidadPuntos, setCantidadPuntos] = useState(5);
   const [cantidadPremios, setCantidadPremios] = useState(1);
   const [descripcion, setDescripcion] = useState('');
-  const [nombre, setNombre] = useState('');
   const [codigoCamarero, setCodigoCamarero] = useState('');
-  const [pedirNombre, setPedirNombre] = useState(false); // activado por el servidor
-  const [pedirCodigo, setPedirCodigo] = useState(false);
+  const [pedirCodigo, setPedirCodigo] = useState(false); // activado por el servidor
 
   const [enviando, setEnviando] = useState(false);
   const [aviso, setAviso] = useState(null);
@@ -86,10 +85,6 @@ export default function Captura() {
   }, [codigoTarjeta]);
 
   const umbral = (perfil && perfil.puntosPremio) || 0;
-  const verNombre = useMemo(
-    () => requiereNombre(puntosDelta, premiosDelta) || pedirNombre,
-    [puntosDelta, premiosDelta, pedirNombre]
-  );
 
   /* ── simulación sólo visual ────────────────────────── */
   const previo = useMemo(() => {
@@ -135,9 +130,7 @@ export default function Captura() {
   const limpiar = () => {
     setPuntosDelta(0);
     setPremiosDelta(0);
-    setNombre('');
     setCodigoCamarero('');
-    setPedirNombre(false);
     setPedirCodigo(false);
     setDescripcion('');
     intento.current = null;
@@ -151,15 +144,10 @@ export default function Captura() {
       setAviso({ tipo: 'error', texto: 'La operación no cambia nada: suma o resta algo antes de confirmar.' });
       return;
     }
-    if (verNombre && !nombre.trim()) {
-      setPedirNombre(true);
-      setAviso({ tipo: 'error', texto: 'Esta operación necesita un nombre: rellena el campo y vuelve a confirmar.' });
-      return;
-    }
 
-    const body = { puntosDelta, premiosDelta };
+    // `nombre` SIEMPRE va: lo rellena el navegador con el id del dispositivo.
+    const body = { puntosDelta, premiosDelta, nombre: deviceId() };
     if (descripcion.trim()) body.descripcion = descripcion.trim();
-    if (nombre.trim()) body.nombre = nombre.trim();
     if (codigoCamarero.trim()) body.codigoCamarero = codigoCamarero.trim();
 
     // Idempotencia: clave nueva por acción; se reutiliza si los deltas no cambian.
@@ -193,19 +181,13 @@ export default function Captura() {
 
       setPuntosDelta(0);
       setPremiosDelta(0);
-      setNombre('');
       setCodigoCamarero('');
       setDescripcion('');
-      setPedirNombre(false);
       setPedirCodigo(false);
       intento.current = null;
     } catch (e) {
-      if (e.code === 'NOMBRE_REQUERIDO') {
-        setPedirNombre(true);
-        setAviso({ tipo: 'error', texto: `${e.message} — rellena el nombre y vuelve a confirmar (misma operación).` });
-      } else if (e.code === 'CODIGO_CAMARERO_REQUERIDO') {
+      if (e.code === 'CODIGO_CAMARERO_REQUERIDO') {
         setPedirCodigo(true);
-        setPedirNombre(true);
         setAviso({ tipo: 'error', texto: `${e.message} — rellena el código y vuelve a confirmar (misma operación).` });
       } else {
         setAviso({ tipo: 'error', texto: `${e.message}${e.code ? ` (${e.code})` : ''}` });
@@ -335,7 +317,7 @@ export default function Captura() {
             +1
           </button>
           {puedeRestarPuntos && (
-            <button className="btn btn-ghost" onClick={() => sumarPuntos(-1)} title="Quitar un punto (pide nombre)">
+            <button className="btn btn-ghost" onClick={() => sumarPuntos(-1)} title="Quitar un punto">
               −1
             </button>
           )}
@@ -458,7 +440,7 @@ export default function Captura() {
             {puedeRestarPremios && !restarPremiosOK && (
               <p className="muted small">Sólo hay {premiosMostrar} premios disponibles.</p>
             )}
-            <p className="muted small">Los premios modificados a mano SÍ se envían al servidor y piden nombre.</p>
+            <p className="muted small">Los premios modificados a mano SÍ se envían al servidor.</p>
           </MasOpciones>
 
           <span className="muted small">
@@ -475,11 +457,10 @@ export default function Captura() {
           />
         </Campo2>
 
-        {verNombre && (
-          <Campo2 label="Nombre" requerido>
-            <input className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} autoFocus />
-          </Campo2>
-        )}
+        {/* Sin campo de nombre: el navegador rellena `nombre` con su propio id */}
+        <p className="muted small">
+          Operación registrada con el identificador de este navegador: <code className="codigo">{deviceId()}</code>
+        </p>
 
         {pedirCodigo && (
           <Campo2 label="Código de camarero" requerido>
@@ -499,7 +480,11 @@ export default function Captura() {
           >
             {enviando ? 'Enviando…' : 'Confirmar'}
           </button>
-          <button className="btn btn-ghost" onClick={limpiar} disabled={!hayBuffer && !nombre && !aviso}>
+          <button
+            className="btn btn-ghost"
+            onClick={limpiar}
+            disabled={!hayBuffer && !codigoCamarero && !descripcion && !aviso}
+          >
             Limpiar
           </button>
           <Link className="btn btn-ghost" to="/comercio">
