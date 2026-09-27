@@ -24,8 +24,18 @@ configuración (la URL del servidor API) está a la vista en `src/config.js`.
 Helpers exportados: `capturaUrl(id)`, `capturaPath(id)`, `registroUrl(código)`,
 `registroPath(código)`.
 
-Producción: `npm run build` → carpeta `dist/` (el enrutado es *history*, el
-servidor debe servir `index.html` para cualquier `/ruta`).
+Producción: `npm run build` → carpeta `dist/` (el enrutado es *history*).
+
+**Rutas directas**: el servidor debe devolver `index.html` para cualquier
+`/ruta` que no sea un fichero, si no, entrar a mano en
+`https://tu-dominio/comercio/escanear` responde *404 página no encontrada*
+(aunque dentro de la app sí se llegue navegando). Para eso el proyecto incluye
+`public/.htaccess` (Apache/Hostinger), que Vite copia a `dist/` en cada build:
+sube ese `.htaccess` junto al resto y **purga la caché del CDN** del hosting.
+Si tu servidor no es Apache, crea su equivalente (Nginx
+`try_files $uri $uri/ /index.html;`, Netlify/Cloudflare `_redirects`
+`/* /index.html 200`, Vercel rewrites). Comprobación: `curl -I
+https://tu-dominio/comercio/escanear` debe dar `200`.
 
 ---
 

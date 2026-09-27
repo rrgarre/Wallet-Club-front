@@ -1,0 +1,24 @@
+# Wallet Club - SPA en modo "history" (react-router)
+#
+# El front tiene rutas como /comercio/escanear o /comercio/captura/3 que NO
+# corresponden a un fichero real. Sin esta regla el hosting responde 404 al
+# entrar directamente en la URL (el caso normal de los camareros), aunque
+# dentro de la app si se llegue navegando.
+#
+# Cualquier peticion que no sea un fichero/carpeta existente se resuelve con
+# index.html y ya es React quien decide que pantalla mostrar.
+#
+# Ojo con /assets: si falta un fichero compilado se quiere un 404 limpio,
+# no el index.html (evita errores de MIME/type al cargar el JS).
+#
+# Vite copia este fichero a dist/ en cada "npm run build". Sube el dist
+# entero, INCLUIDO este: muchos FTP/paneles ocultan los ficheros que
+# empiezan por punto (activa "mostrar archivos ocultos").
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteCond %{REQUEST_URI} !^/assets/
+  RewriteRule . /index.html [L]
+</IfModule>
