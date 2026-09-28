@@ -61,7 +61,8 @@ export default function AltaTarjeta() {
             {/* key: al cambiar de comercio se reinicia el formulario y su estado de éxito */}
             <FormRegistro key={comercio.idRandomLargo} idRandomLargo={comercio.idRandomLargo} />
             <p className="muted small">
-              Nota: al registrarse se emite un token de tarjeta; aquí no se guarda para no pisar tu sesión de admin.
+              Nota: el alta no devuelve token ni inicia sesión (contrato §3.5), así que tu sesión de admin no se
+              toca.
             </p>
           </>
         ) : (

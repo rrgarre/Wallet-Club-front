@@ -172,13 +172,15 @@ La API no expone el histórico de operaciones al comercio, sólo al admin.
 | `/tarjeta` | Login (email + contraseña; si el email está en varios comercios pide el comercio) + saldo en grande + **QR grande** que contiene **sólo el identificador** de la tarjeta (lo escanea el comercio) + historial propio |
 | `/tarjeta/registro/:idRandomLargo` | **Alta pública.** El código va en la URL y no se puede tocar desde el formulario. **Sin contraseña** (v1.6): sólo pide nombre y email, la contraseña la fija el servidor. Sin parámetro usa `0000…0000` (48 ceros), que **no** corresponde a ningún comercio real. También acepta `?c=<codigo>` |
 
-El registro devuelve `token`: el cliente queda logueado automáticamente. Además
-**no navega enseguida**: se queda en la pantalla de éxito para enseñar el
-`googleWalletUrl` devuelto (botón «Añadir tarjeta a Google Wallet», que abre en
-pestaña nueva). Ya **no hay botón para ir a `/tarjeta`** ni redirección
-automática: el usuario entra a su sitio cuando quiera, con la sesión ya
-iniciada. Tampoco se explica la URL: sólo se muestra el código del comercio
-(la ruta sigue siendo la que trae el navegador).
+El registro **no devuelve `token`** (v1.6): el cliente **no queda logueado** y
+el front **no abre sesión** con la respuesta (ni `entrar()`, ni nada en
+`localStorage`). Además **no navega enseguida**: se queda en la pantalla de
+éxito para enseñar el `googleWalletUrl` devuelto (botón «Añadir tarjeta a
+Google Wallet», que abre en pestaña nueva). **No hay botón para ir a
+`/tarjeta`** ni redirección automática: quien quiera ver su tarjeta entra a
+mano desde `/tarjeta` (login, que sí devuelve token). Tampoco se explica la
+URL: sólo se muestra el código del comercio (la ruta sigue siendo la que trae
+el navegador).
 
 ### Destino tras el login
 `/login` y los logins individuales mandan **admin → `/admin`,

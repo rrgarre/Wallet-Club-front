@@ -51,12 +51,16 @@ export function AuthProvider({ children }) {
   };
 
   /**
-   * Alta de tarjeta. Devuelve la respuesta cruda (con token) SIN tocar la sesión:
-   * quien decide si loguear al nuevo cliente es la pantalla que llama
-   * (la ruta pública usa `entrar()`, el alta desde el panel de admin no).
+   * Alta de tarjeta. Devuelve la respuesta cruda SIN tocar la sesión.
    *
-   * v1.6: NO se envía `password` — la pone el servidor (`USUARIO_PASSWORD`)
-   * y el login de tarjeta autentica con ella; si el body la trae, se ignora.
+   * §3.5 (v1.6): el `201` viene **sin `token` ni `role`** → el alta nunca
+   * inicia sesión en el navegador (sólo `usuario`, `comercio` y
+   * `googleWalletUrl`). Quien quiera entrar en `/tarjeta` lo hace con el
+   * login (§3.4), que sí devuelve token.
+   *
+   * v1.6 también: NO se envía `password` — la pone el servidor
+   * (`USUARIO_PASSWORD`) y el login de tarjeta autentica con ella; si el
+   * body la trae, se ignora.
    */
   const registrarTarjeta = async (idRandomLargo, { nombre, email }) =>
     api(`/api/registro/tarjeta/${idRandomLargo}`, {

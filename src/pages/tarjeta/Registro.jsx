@@ -31,7 +31,7 @@ export default function Registro() {
           <code className="codigo largo">{codigo}</code>
         </div> */}
 
-        <FormRegistro idRandomLargo={codigo} redirigir />
+        <FormRegistro idRandomLargo={codigo} publico />
 
         </div>
     </div>
@@ -41,8 +41,12 @@ export default function Registro() {
 /**
  * Formulario de alta reutilizado por la ruta pública y por el panel de admin.
  * - `onRegistrado(respuesta)` recibe la respuesta completa del endpoint.
- * - `redirigir` = la ruta pública loguea al nuevo cliente (sin salir todavía
- *   de esta pantalla, para poder enseñar el enlace de Google Wallet).
+ * - `publico` = la ruta pública (frente al alta desde el panel de admin): no
+ *   ofrece «Registrar otra tarjeta».
+ *
+ * El alta **NO inicia sesión** (contrato §3.5, v1.6): el `201` viene sin
+ * `token` ni `role`, así que el navegador queda sin loguear y quien quiera
+ * entrar en `/tarjeta` lo hace a mano con el login.
  *
  * El backend devuelve `googleWalletUrl` tras el alta: es el enlace con el que
  * el cliente registra la tarjeta en su Wallet.
@@ -51,8 +55,8 @@ export function urlWallet(res) {
   return res?.googleWalletUrl || res?.usuario?.googleWalletUrl || res?.tarjeta?.googleWalletUrl || null;
 }
 
-export function FormRegistro({ idRandomLargo, onRegistrado, redirigir = false }) {
-  const { registrarTarjeta, entrar } = useAuth();
+export function FormRegistro({ idRandomLargo, onRegistrado, publico = false }) {
+  const { registrarTarjeta } = useAuth();
   // v1.6: sin contraseña — la pone el servidor (USUARIO_PASSWORD) y el
   // formulario de alta ya no la pide ni la envía (API_CONTRACT §3.5).
   const [f, setF] = useState({ nombre: '', email: '' });
@@ -77,7 +81,8 @@ export function FormRegistro({ idRandomLargo, onRegistrado, redirigir = false })
         nombre: f.nombre.trim(),
         email: f.email.trim(),
       });
-      if (redirigir) entrar(res); // alta con token: queda logueada, pero NO salimos todavía
+      // §3.5 (v1.6): el 201 llega SIN token → aquí NO se abre sesión: ni
+      // `entrar()`, ni localStorage, ni redirección a la pantalla de usuario.
       setCreado(res);
       if (onRegistrado) onRegistrado(res);
     } catch (err) {
@@ -126,10 +131,10 @@ export function FormRegistro({ idRandomLargo, onRegistrado, redirigir = false })
           </p>
         )}
 
-        {/* Sólo el alta desde admin ofrece repetir. La pública ya NO tiene
-            acceso al sitio del cliente: se entra desde /tarjeta cuando se
-            quiera (el alta deja la sesión iniciada). */}
-        {!redirigir && (
+        {/* Sólo el alta desde admin ofrece repetir. La pública no inicia
+            sesión (201 sin token): quien quiera ver su tarjeta entra a mano
+            desde /tarjeta con los enlaces de abajo. */}
+        {!publico && (
           <div className="form-pie">
             <button className="btn" onClick={reiniciar}>
               Registrar otra tarjeta
