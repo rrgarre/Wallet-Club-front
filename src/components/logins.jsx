@@ -59,11 +59,15 @@ export function FormLoginAdmin({ onListo }) {
 }
 
 /* ──────────────────────── Comercio ──────────────────────── */
+/**
+ * Acceso de comercio **sólo por código largo** (`idRandomLargo`): ya no hay
+ * desplegable para elegir entre nombre del comercio y código.
+ * `prefijo` precarga el código (p. ej. `/comercio?c=<idRandomLargo>`).
+ */
 export function FormLoginComercio({ onListo, prefijo }) {
   const { loginComercio } = useAuth();
   const navegar = useNavigate();
   const loc = useLocation();
-  const [por, setPor] = useState(prefijo && /^[0-9a-f]{48}$/i.test(prefijo) ? 'codigo' : 'nombre');
   const [identificador, setIdentificador] = useState(prefijo || '');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
@@ -74,11 +78,7 @@ export function FormLoginComercio({ onListo, prefijo }) {
     setEnviando(true);
     setError(null);
     try {
-      await loginComercio({
-        password,
-        nombre: por === 'nombre' ? identificador : undefined,
-        idRandomLargo: por === 'codigo' ? identificador : undefined,
-      });
+      await loginComercio({ password, idRandomLargo: identificador });
       if (onListo) onListo();
       else navegar(destinoTrasLogin('comercio', loc.state?.next), { replace: true });
     } catch (err) {
@@ -91,13 +91,11 @@ export function FormLoginComercio({ onListo, prefijo }) {
   return (
     <form onSubmit={enviar} className="form">
       <Aviso tipo="error">{error}</Aviso>
-      <Campo label="Identificarse por" requerido>
-        <select className="input" value={por} onChange={(e) => setPor(e.target.value)}>
-          <option value="nombre">Nombre del comercio</option>
-          <option value="codigo">Código largo (idRandomLargo)</option>
-        </select>
-      </Campo>
-      <Campo label={por === 'nombre' ? 'Nombre del comercio' : 'Código largo'} requerido>
+      <Campo
+        label="Código largo (idRandomLargo)"
+        requerido
+        hint="Te lo dio el admin; también está en tu panel y en el QR de alta"
+      >
         <input className="input" value={identificador} onChange={(e) => setIdentificador(e.target.value)} autoFocus />
       </Campo>
       <Campo label="Contraseña" requerido>

@@ -106,7 +106,7 @@ Según con quién entres, te manda a tu zona (y cada zona protege su rol).
 ### Comercio
 | Ruta | Contenido |
 |---|---|
-| `/comercio` | Login (por nombre o por `idRandomLargo`) + perfil del comercio + su lista de tarjetas + **botones de acceso rápido** a *Escanear QR* y *Capturar puntos*. `?c=<codigo>` precarga el identificador (ideal para el QR) |
+| `/comercio` | Login **sólo por `idRandomLargo`** (sin desplegable de nombre) + perfil del comercio + su lista de tarjetas + **botones de acceso rápido** a *Escanear QR* y *Capturar puntos*. `?c=<codigo>` precarga el código (ideal para el QR) |
 | `/comercio/escanear` | **Lector de QR de tarjeta** (pide login de comercio si hace falta) |
 | `/comercio/captura/:codigo` | **Captura de puntos.** `:codigo` es el id de la tarjeta; también vale `/comercio/captura?tarjeta=<id>`. Sin código, muestra el selector de tarjetas |
 | `/comercio/password` | **Cambio de contraseña del comercio** (`PATCH /api/comercio/password`, §5.5): actual + nueva (mínimo 8) + repetición. Errores traducidos: `PASSWORD_ACTUAL_INCORRECTA`, `VALIDATION`, `COMERCIO_INACTIVO`. Pide login de comercio |

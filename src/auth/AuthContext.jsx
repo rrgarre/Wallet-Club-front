@@ -34,14 +34,17 @@ export function AuthProvider({ children }) {
   const loginAdmin = async (nombre, password) =>
     entrar(await api('/api/auth/admin/login', { method: 'POST', body: { nombre, password }, token: false }));
 
-  /** identificador: { nombre } o { idRandomLargo } según lo que introduzca el usuario */
-  const loginComercio = async ({ password, nombre, idRandomLargo }) => {
-    const body = { password };
-    if (idRandomLargo) body.idRandomLargo = idRandomLargo;
-    else body.nombre = nombre;
+  /**
+   * Login de comercio: **SÓLO por código largo** (`idRandomLargo`) — en el
+   * front ya no existe la opción de entrar con `nombre` (se quitó el
+   * desplegable del formulario).
+   */
+  const loginComercio = async ({ password, idRandomLargo }) => {
     // `entrar` guarda en localStorage Y actualiza el estado de React:
     // sin eso haría falta pulsar F5 para que se vea la sesión.
-    return entrar(await api('/api/auth/comercio/login', { method: 'POST', body, token: false }));
+    return entrar(
+      await api('/api/auth/comercio/login', { method: 'POST', body: { password, idRandomLargo }, token: false })
+    );
   };
 
   const loginTarjeta = async ({ email, password, comercioId }) => {
