@@ -107,6 +107,9 @@ function Panel() {
               <Link className="acceso-grande secundario" to="/comercio/captura">
                 <span className="acceso-icono">✏️</span> Capturar puntos
               </Link>
+              <Link className="acceso-grande secundario" to="/comercio/password">
+                <span className="acceso-icono">🔑</span> Cambiar contraseña
+              </Link>
             </div>
 
             <div className="tarjeta">

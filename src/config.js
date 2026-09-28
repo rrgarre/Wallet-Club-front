@@ -22,8 +22,8 @@ const limpiar = (url) => (url || '').replace(/\/+$/, '');
 
 // ↓ Alternativa rápida: comenta la línea de arriba y descomenta esta para
 //   apuntar al servidor remoto (sólo puede estar activa una de las dos).
-// export const API_BASE = limpiar('http://localhost:3010') || 'http://localhost:3000';
-export const API_BASE = limpiar('https://api.walletclub.ssl-alert.com');
+export const API_BASE = limpiar('http://localhost:3010') || 'http://localhost:3000';
+// export const API_BASE = limpiar('https://api.walletclub.ssl-alert.com');
 
 /** Base del front: origen dinámico del navegador (sin configurar). */
 export const FRONT_BASE = window.location.origin;

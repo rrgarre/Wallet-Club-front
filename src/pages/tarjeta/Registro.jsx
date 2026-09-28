@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import { Aviso, Campo } from '../../components/ui.jsx';
 /**
@@ -26,21 +26,14 @@ export default function Registro() {
           </div>
         </div>
 
-        <div className="bloque-codigo">
-          <span className="muted small">Comercio (código de la URL, fijo en el formulario):</span>
+        {/* <div className="bloque-codigo">
+          <span className="muted small">Comercio:</span>
           <code className="codigo largo">{codigo}</code>
-          <span className="muted small">
-            Editando el navegador: <code>/tarjeta/registro/&lt;idRandomLargo&gt;</code>
-          </span>
-        </div>
+        </div> */}
 
         <FormRegistro idRandomLargo={codigo} redirigir />
 
-        <div className="enlaces-login">
-          <Link to="/tarjeta">Ya tengo cuenta</Link>
-          <Link to="/login">Acceso unificado</Link>
         </div>
-      </div>
     </div>
   );
 }
@@ -60,8 +53,9 @@ export function urlWallet(res) {
 
 export function FormRegistro({ idRandomLargo, onRegistrado, redirigir = false }) {
   const { registrarTarjeta, entrar } = useAuth();
-  const navegar = useNavigate();
-  const [f, setF] = useState({ nombre: '', email: '', password: '', repetir: '' });
+  // v1.6: sin contraseña — la pone el servidor (USUARIO_PASSWORD) y el
+  // formulario de alta ya no la pide ni la envía (API_CONTRACT §3.5).
+  const [f, setF] = useState({ nombre: '', email: '' });
   const [error, setError] = useState(null);
   const [enviando, setEnviando] = useState(false);
   const [creado, setCreado] = useState(null); // respuesta del alta
@@ -70,27 +64,18 @@ export function FormRegistro({ idRandomLargo, onRegistrado, redirigir = false })
 
   const reiniciar = () => {
     setCreado(null);
-    setF({ nombre: '', email: '', password: '', repetir: '' });
+    setF({ nombre: '', email: '' });
     setError(null);
   };
 
   const enviar = async (e) => {
     e.preventDefault();
     setError(null);
-    if (f.password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres.');
-      return;
-    }
-    if (f.password !== f.repetir) {
-      setError('Las contraseñas no coinciden.');
-      return;
-    }
     setEnviando(true);
     try {
       const res = await registrarTarjeta(idRandomLargo, {
         nombre: f.nombre.trim(),
         email: f.email.trim(),
-        password: f.password,
       });
       if (redirigir) entrar(res); // alta con token: queda logueada, pero NO salimos todavía
       setCreado(res);
@@ -121,7 +106,8 @@ export function FormRegistro({ idRandomLargo, onRegistrado, redirigir = false })
               en <b>{creado.comercio.nombre}</b>
             </>
           ) : null}
-          {creado.usuario?.id ? ` (id ${creado.usuario.id})` : ''}.
+          {/* {creado.usuario?.id ? ` (id ${creado.usuario.id})` : ''} */}
+          .
         </Aviso>
 
         {wallet ? (
@@ -132,7 +118,7 @@ export function FormRegistro({ idRandomLargo, onRegistrado, redirigir = false })
             <p className="muted small">
               Se abrirá Google Wallet para que el cliente registre su tarjeta en el móvil.
             </p>
-            <code className="codigo largo">{wallet}</code>
+            {/* <code className="codigo largo">{wallet}</code> */}
           </>
         ) : (
           <p className="muted small">
@@ -140,17 +126,16 @@ export function FormRegistro({ idRandomLargo, onRegistrado, redirigir = false })
           </p>
         )}
 
-        <div className="form-pie">
-          {redirigir ? (
-            <button className="btn btn-primario" onClick={() => navegar('/tarjeta', { replace: true })}>
-              Continuar a mi tarjeta →
-            </button>
-          ) : (
+        {/* Sólo el alta desde admin ofrece repetir. La pública ya NO tiene
+            acceso al sitio del cliente: se entra desde /tarjeta cuando se
+            quiera (el alta deja la sesión iniciada). */}
+        {!redirigir && (
+          <div className="form-pie">
             <button className="btn" onClick={reiniciar}>
               Registrar otra tarjeta
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -164,18 +149,8 @@ export function FormRegistro({ idRandomLargo, onRegistrado, redirigir = false })
       <Campo label="Email" requerido>
         <input className="input" type="email" value={f.email} onChange={(e) => set('email', e.target.value)} />
       </Campo>
-      <Campo label="Contraseña" requerido hint="Mínimo 6 caracteres">
-        <input className="input" type="password" value={f.password} onChange={(e) => set('password', e.target.value)} />
-      </Campo>
-      <Campo label="Repite la contraseña" requerido>
-        <input
-          className="input"
-          type="password"
-          value={f.repetir}
-          onChange={(e) => set('repetir', e.target.value)}
-        />
-      </Campo>
-      <button className="btn btn-primario" disabled={enviando || !f.nombre || !f.email || !f.password}>
+      {/* Sin contraseña: la fija el servidor (contrato §3.5 v1.6) */}
+      <button className="btn btn-primario" disabled={enviando || !f.nombre || !f.email}>
         {enviando ? 'Creando cuenta…' : 'Crear cuenta'}
       </button>
     </form>

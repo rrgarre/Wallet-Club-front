@@ -16,6 +16,7 @@ import AdminTesteo from './pages/admin/Testeo.jsx';
 
 import ComercioZona from './pages/comercio/Zona.jsx';
 import ComercioCaptura from './pages/comercio/Captura.jsx';
+import ComercioPassword from './pages/comercio/Password.jsx';
 // El lector de QR lleva su motor de decodificación (zxing): se carga sólo
 // cuando alguien entra en /comercio/escanear, para no engordar el bundle.
 const ComercioEscanear = lazy(() => import('./pages/comercio/Escanear.jsx'));
@@ -65,6 +66,15 @@ export default function App() {
         element={
           <ExigirRol rol="comercio">
             <ComercioCaptura />
+          </ExigirRol>
+        }
+      />
+      {/* 2b' — Cambio de la contraseña del comercio (§5.5) */}
+      <Route
+        path="/comercio/password"
+        element={
+          <ExigirRol rol="comercio">
+            <ComercioPassword />
           </ExigirRol>
         }
       />

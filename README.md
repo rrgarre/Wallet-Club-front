@@ -109,6 +109,7 @@ Según con quién entres, te manda a tu zona (y cada zona protege su rol).
 | `/comercio` | Login (por nombre o por `idRandomLargo`) + perfil del comercio + su lista de tarjetas + **botones de acceso rápido** a *Escanear QR* y *Capturar puntos*. `?c=<codigo>` precarga el identificador (ideal para el QR) |
 | `/comercio/escanear` | **Lector de QR de tarjeta** (pide login de comercio si hace falta) |
 | `/comercio/captura/:codigo` | **Captura de puntos.** `:codigo` es el id de la tarjeta; también vale `/comercio/captura?tarjeta=<id>`. Sin código, muestra el selector de tarjetas |
+| `/comercio/password` | **Cambio de contraseña del comercio** (`PATCH /api/comercio/password`, §5.5): actual + nueva (mínimo 8) + repetición. Errores traducidos: `PASSWORD_ACTUAL_INCORRECTA`, `VALIDATION`, `COMERCIO_INACTIVO`. Pide login de comercio |
 
 La API no expone el histórico de operaciones al comercio, sólo al admin.
 
@@ -169,12 +170,15 @@ La API no expone el histórico de operaciones al comercio, sólo al admin.
 | Ruta | Contenido |
 |---|---|
 | `/tarjeta` | Login (email + contraseña; si el email está en varios comercios pide el comercio) + saldo en grande + **QR grande** que contiene **sólo el identificador** de la tarjeta (lo escanea el comercio) + historial propio |
-| `/tarjeta/registro/:idRandomLargo` | **Alta pública.** El código va en la URL y no se puede tocar desde el formulario. Sin parámetro usa `0000…0000` (48 ceros), que **no** corresponde a ningún comercio real. También acepta `?c=<codigo>` |
+| `/tarjeta/registro/:idRandomLargo` | **Alta pública.** El código va en la URL y no se puede tocar desde el formulario. **Sin contraseña** (v1.6): sólo pide nombre y email, la contraseña la fija el servidor. Sin parámetro usa `0000…0000` (48 ceros), que **no** corresponde a ningún comercio real. También acepta `?c=<codigo>` |
 
 El registro devuelve `token`: el cliente queda logueado automáticamente. Además
 **no navega enseguida**: se queda en la pantalla de éxito para enseñar el
 `googleWalletUrl` devuelto (botón «Añadir tarjeta a Google Wallet», que abre en
-pestaña nueva) y un botón para continuar a `/tarjeta`.
+pestaña nueva). Ya **no hay botón para ir a `/tarjeta`** ni redirección
+automática: el usuario entra a su sitio cuando quiera, con la sesión ya
+iniciada. Tampoco se explica la URL: sólo se muestra el código del comercio
+(la ruta sigue siendo la que trae el navegador).
 
 ### Destino tras el login
 `/login` y los logins individuales mandan **admin → `/admin`,
@@ -186,8 +190,16 @@ apunta dentro de la propia zona (p. ej. llegar al login desde
 
 ## Decisiones / límites marcados por el contrato
 
-- No existen DELETE, edición de tarjetas, reset de contraseñas, logout en
-  servidor ni registro de admins: esas acciones **no están implementadas**.
+- No existen DELETE, edición de tarjetas, reset de contraseñas por email,
+  logout en servidor ni registro de admins: esas acciones **no están
+  implementadas**. El cambio de contraseña **del comercio** sí está
+  (§5.5 → `/comercio/password`); el admin restablece la de otros desde
+  `/admin/comercios`.
+- **Alta de tarjeta sin contraseña (v1.6)**: el formulario sólo envía
+  `nombre` y `email`. La contraseña la fija el servidor
+  (`USUARIO_PASSWORD`), así que el login de `/tarjeta` sigue implementado
+  (contrato §3.4) pero **ya no se le pide contraseña a nadie** al darse de
+  alta: cualquier `password` enviada al registro se ignora.
 - Un `404 TARJETA_NOT_FOUND` significa «no existe o no es de tu comercio»: la
   interfaz no distingue ambos casos (como pide el contrato).
 - **Google Wallet (contrato v1.1)**: sólo existe el alta de clase. Si se
@@ -210,7 +222,7 @@ src/
   lib/qr.js              lectura del QR de tarjeta (sólo identificador)
   components/            logins, guardas de rol, tabla de operaciones, ui, pwa
   pages/admin/           SPA de administración
-  pages/comercio/        web del comercio + captura + lector de QR
+  pages/comercio/        web del comercio + captura + lector de QR + contraseña
   pages/tarjeta/         web del cliente + registro
 scripts/
   gen-icons.mjs          iconos de la PWA + favicon (node scripts/gen-icons.mjs)

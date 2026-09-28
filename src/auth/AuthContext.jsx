@@ -54,11 +54,14 @@ export function AuthProvider({ children }) {
    * Alta de tarjeta. Devuelve la respuesta cruda (con token) SIN tocar la sesión:
    * quien decide si loguear al nuevo cliente es la pantalla que llama
    * (la ruta pública usa `entrar()`, el alta desde el panel de admin no).
+   *
+   * v1.6: NO se envía `password` — la pone el servidor (`USUARIO_PASSWORD`)
+   * y el login de tarjeta autentica con ella; si el body la trae, se ignora.
    */
-  const registrarTarjeta = async (idRandomLargo, { nombre, email, password }) =>
+  const registrarTarjeta = async (idRandomLargo, { nombre, email }) =>
     api(`/api/registro/tarjeta/${idRandomLargo}`, {
       method: 'POST',
-      body: { nombre, email, password },
+      body: { nombre, email },
       token: false,
     });
 
