@@ -87,11 +87,14 @@ pantalla de batalla de los camareros). Funciona en **Android/Chrome** e
 
 Login único en **`/login`** con selector de rol: *Admin · Comercio · Tarjeta*.
 Según con quién entres, te manda a tu zona (y cada zona protege su rol).
+El **operario** (rol nuevo v1.8, camarero) no tiene pestaña propia: entra por la
+pestaña *Comercio* con su nombre de usuario y su contraseña de operario, y el
+`role` que devuelve la API lo manda directo al lector de QR.
 
 | Ruta | Contenido |
 |---|---|
 | `/admin` | Resumen: `GET /health`, totales, accesos rápidos |
-| `/admin/comercios` | Listado, alta (`POST`) y edición (`PATCH`), copia del `idRandomLargo` y del enlace/QR de alta |
+| `/admin/comercios` | Listado (con **nombre de usuario**), alta (`POST`) y edición (`PATCH`): nombre, **nombre de usuario**, contraseña de comercio y **contraseña de operario** (escrita = restablecerla), puntos/premio, activo, copia del `idRandomLargo` y del enlace/QR de alta. Traduce `USUARIO_DUPLICADO` y `COMERCIO_DUPLICADO` |
 | `/admin/tarjetas` | Listado global filtrable por comercio, detalle + historial (sólo lectura: el contrato no permite editar tarjetas) |
 | `/admin/operaciones` | Buscador con filtros (comercio, tarjeta, tipo, desde/hasta) y paginación |
 | `/admin/google-wallet` | **Alta de clase en Google Wallet** (`POST /api/admin/comercios/:idRandomLargo/google-wallet/clase`): selector de comercio, URLs https, color, términos y `reviewStatus` en desplegable; muestra el `clase.id` devuelto o el aviso del error |
@@ -106,9 +109,9 @@ Según con quién entres, te manda a tu zona (y cada zona protege su rol).
 ### Comercio
 | Ruta | Contenido |
 |---|---|
-| `/comercio` | Login **sólo por `idRandomLargo`** (sin desplegable de nombre) + perfil del comercio + su lista de tarjetas + **botones de acceso rápido** a *Escanear QR* y *Capturar puntos*. `?c=<codigo>` precarga el código (ideal para el QR) |
-| `/comercio/escanear` | **Lector de QR de tarjeta** (pide login de comercio si hace falta) |
-| `/comercio/captura/:codigo` | **Captura de puntos.** `:codigo` es el id de la tarjeta; también vale `/comercio/captura?tarjeta=<id>`. Sin código, muestra el selector de tarjetas |
+| `/comercio` | Login **por `nombreUsuario` + contraseña** (v1.8: ya no sirve el `idRandomLargo`) + perfil del comercio (muestra su `nombreUsuario`) + su lista de tarjetas + **botones de acceso rápido** a *Escanear QR* y *Capturar puntos*. Un operario que llegue aquí se redirige a su lector |
+| `/comercio/escanear` | **Lector de QR de tarjeta** (pide login de comercio u operario si hace falta). Para el operario se ocultan los accesos al panel (*Mi comercio*, selector de tarjetas): sólo escanea o escribe el número |
+| `/comercio/captura/:codigo` | **Captura de puntos.** `:codigo` es el id de la tarjeta; también vale `/comercio/captura?tarjeta=<id>`. Sin código, muestra el selector de tarjetas (operario: se le manda al lector). Se tolera el `403 FORBIDDEN_ROLE` del perfil (el operario no lo lee): la pantalla sigue funcionando sin umbral local |
 | `/comercio/password` | **Cambio de contraseña del comercio** (`PATCH /api/comercio/password`, §5.5): actual + nueva (mínimo 8) + repetición. Errores traducidos: `PASSWORD_ACTUAL_INCORRECTA`, `VALIDATION`, `COMERCIO_INACTIVO`. Pide login de comercio |
 
 La API no expone el histórico de operaciones al comercio, sólo al admin.
@@ -116,8 +119,10 @@ La API no expone el histórico de operaciones al comercio, sólo al admin.
 #### Lector de QR (`/comercio/escanear`)
 - **Los QR de las tarjetas ya no llevan la URL**: sólo contienen el
   **identificador** numérico de la tarjeta.
-- Si no hay sesión se enseña el **login de comercio en la misma pantalla**; al
-  entrar se vuelve al lector (no manda a `/comercio`).
+- Si no hay sesión se enseña el **login de comercio/operario en la misma
+  pantalla**; al entrar se vuelve al lector (no manda a `/comercio`). El rol
+  viene de la contraseña: la de operario deja en el lector y oculta los
+  accesos al panel.
 - Botón **«Activar cámara»**: el navegador pide su permiso (`getUserMedia`).
   Funciona en **Safari/iOS ≥ 15.1** y en **Chrome/Android** (usa `BarcodeDetector`
   cuando existe y ZXing de respaldo). Fallos de permiso, cámara ocupada o
@@ -196,9 +201,24 @@ fase posterior). El mismo campo existe también en el alta de admin
 
 ### Destino tras el login
 `/login` y los logins individuales mandan **admin → `/admin`,
-comercio → `/comercio`, tarjeta → `/tarjeta`**. Sólo se conserva un `next` si
-apunta dentro de la propia zona (p. ej. llegar al login desde
-`/comercio/captura/3` vuelve a esa pantalla).
+comercio → `/comercio`, operario → `/comercio/escanear`, tarjeta → `/tarjeta`**
+(el operario lo decide el servidor: la contraseña de operario da
+`role: "operario"`, v1.8). Sólo se conserva un `next` si apunta dentro de la
+propia zona —para el operario, al lector o a una captura concreta— (p. ej.
+llegar al login desde `/comercio/captura/3` vuelve a esa pantalla).
+
+### Rol operario (v1.8)
+- **Un sólo formulario** de acceso (`nombreUsuario` + contraseña) para
+  comercio y operario: **la contraseña decide el rol** (primero se prueba la
+  de operario, §3.3). No existe desplegable de comercios ni login por
+  `idRandomLargo`.
+- El operario sólo puede **`/comercio/escanear`** y
+  **`/comercio/captura/:codigo`** (leer la tarjeta + movimiento). Todo lo demás
+  lo devuelve el servidor con `403 FORBIDDEN_ROLE`, así que el front **ni le
+  enseña esos accesos** (panel, selector de tarjetas, cambiar contraseña) y
+  redirige a `/comercio/escanear` si aterriza en `/comercio`.
+- `ExigirRol` acepta `rol` (uno) o `roles` (varios); la captura usa
+  `roles={['comercio', 'operario']}`.
 
 ---
 
@@ -207,8 +227,8 @@ apunta dentro de la propia zona (p. ej. llegar al login desde
 - No existen DELETE, edición de tarjetas, reset de contraseñas por email,
   logout en servidor ni registro de admins: esas acciones **no están
   implementadas**. El cambio de contraseña **del comercio** sí está
-  (§5.5 → `/comercio/password`); el admin restablece la de otros desde
-  `/admin/comercios`.
+  (§5.5 → `/comercio/password`); el admin restablece la de otros —incluida la
+  de operario (§7.4 `operarioPassword`)— desde `/admin/comercios`.
 - **Alta de tarjeta sin contraseña (v1.6)**: el formulario sólo envía
   `nombre` y `email`. La contraseña la fija el servidor
   (`USUARIO_PASSWORD`), así que el login de `/tarjeta` sigue implementado

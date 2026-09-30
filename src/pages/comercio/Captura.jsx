@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../../api/client.js';
+import { useAuth } from '../../auth/AuthContext.jsx';
 import { capturaPath, FRONT_BASE } from '../../config.js';
 import { Aviso, Cargando, MasOpciones } from '../../components/ui.jsx';
 import { deviceId, simularSaldo, uuid } from '../../lib/util.js';
@@ -29,6 +30,10 @@ export default function Captura() {
   const { codigo } = useParams();
   const [params] = useSearchParams();
   const codigoTarjeta = codigo || params.get('tarjeta') || '';
+  const { sesion } = useAuth();
+  // v1.8: el operario sólo llega aquí desde el QR (con el código en la URL):
+  // no lee el perfil del comercio (403) ni puede listar tarjetas.
+  const esOperario = sesion?.role === 'operario';
 
   const [perfil, setPerfil] = useState(null);
   const [tarjeta, setTarjeta] = useState(null);
@@ -56,9 +61,16 @@ export default function Captura() {
     setError(null);
     (async () => {
       try {
-        const p = await api('/api/comercio/perfil');
-        if (!vivo) return;
-        setPerfil(p.comercio);
+        // El perfil da el umbral de premios; el operario (v1.8) no puede
+        // leerlo (403 FORBIDDEN_ROLE), así que seguimos sin umbral en vez de
+        // romper la pantalla: los contadores los decide el servidor igual.
+        try {
+          const p = await api('/api/comercio/perfil');
+          if (!vivo) return;
+          setPerfil(p.comercio);
+        } catch (e) {
+          if (e.code !== 'FORBIDDEN_ROLE') throw e;
+        }
 
         if (codigoTarjeta) {
           setLista(null);
@@ -199,6 +211,9 @@ export default function Captura() {
 
   /* ── pantalla sin código en la URL: selector ───────── */
   if (!codigoTarjeta) {
+    // El operario (v1.8) no puede listar tarjetas: su camino es escanear el
+    // QR o escribir el número, así que este selector no es para él.
+    if (esOperario) return <Navigate to="/comercio/escanear" replace />;
     return (
       <Cuerpo>
         <div className="tarjeta">
@@ -247,8 +262,8 @@ export default function Captura() {
             Comprueba el código de la URL: <code>{codigoTarjeta}</code>. Si no pertenece a tu comercio, la API
             responde <code>404 TARJETA_NOT_FOUND</code> (igual que si no existe).
           </p>
-          <Link className="btn" to="/comercio/captura">
-            Volver al selector de tarjetas
+          <Link className="btn" to={esOperario ? '/comercio/escanear' : '/comercio/captura'}>
+            {esOperario ? 'Volver al lector QR' : 'Volver al selector de tarjetas'}
           </Link>
         </div>
       </Cuerpo>
@@ -487,7 +502,7 @@ export default function Captura() {
           >
             Limpiar
           </button>
-          <Link className="btn btn-ghost" to="/comercio">
+          <Link className="btn btn-ghost" to={esOperario ? '/comercio/escanear' : '/comercio'}>
             Volver
           </Link>
         </div>
@@ -508,6 +523,11 @@ function Campo2({ label, children, requerido }) {
 }
 
 function Cuerpo({ children }) {
+  // «Mi comercio» se oculta al operario (v1.8): su panel no es accesible
+  // (el servidor responde 403 FORBIDDEN_ROLE en todo el panel).
+  const { sesion } = useAuth();
+  const esOperario = sesion?.role === 'operario';
+
   return (
     <div className="zona-cliente">
       <header className="barra">
@@ -521,9 +541,11 @@ function Cuerpo({ children }) {
           <Link className="btn btn-mini" to="/comercio/escanear">
             📷 Escanear QR
           </Link>
-          <Link className="btn btn-ghost btn-mini" to="/comercio">
-            Mi comercio
-          </Link>
+          {!esOperario && (
+            <Link className="btn btn-ghost btn-mini" to="/comercio">
+              Mi comercio
+            </Link>
+          )}
         </div>
       </header>
 

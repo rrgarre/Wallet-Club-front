@@ -23,7 +23,13 @@ function guardar(data) {
 export function AuthProvider({ children }) {
   const [sesion, setSesion] = useState(leerSesion);
 
-  const entrar = (data) => setSesion(guardar(data));
+  /** Guarda la sesión en React Y la devuelve: el login de comercio (v1.8)
+   *  necesita el `role` recién recibido para ramificar (comercio u operario). */
+  const entrar = (data) => {
+    const s = guardar(data);
+    setSesion(s);
+    return s;
+  };
 
   const salir = () => {
     localStorage.removeItem(SESSION_KEY);
@@ -35,17 +41,18 @@ export function AuthProvider({ children }) {
     entrar(await api('/api/auth/admin/login', { method: 'POST', body: { nombre, password }, token: false }));
 
   /**
-   * Login de comercio: **SÓLO por código largo** (`idRandomLargo`) — en el
-   * front ya no existe la opción de entrar con `nombre` (se quitó el
-   * desplegable del formulario).
+   * Login de comercio (§3.3, v1.8): **sólo `nombreUsuario` + `password`**.
+   * Ya no se manda `idRandomLargo` ni `nombre` (sin `nombreUsuario` el
+   * servidor responde `400 VALIDATION`).
+   *
+   * La contraseña decide el rol — primero se prueba la de operario — así que
+   * la respuesta puede traer `role: "comercio"` o `role: "operario"`: devuelve
+   * la sesión para que la pantalla que llama navegue según ese rol.
    */
-  const loginComercio = async ({ password, idRandomLargo }) => {
+  const loginComercio = async ({ nombreUsuario, password }) =>
     // `entrar` guarda en localStorage Y actualiza el estado de React:
     // sin eso haría falta pulsar F5 para que se vea la sesión.
-    return entrar(
-      await api('/api/auth/comercio/login', { method: 'POST', body: { password, idRandomLargo }, token: false })
-    );
-  };
+    entrar(await api('/api/auth/comercio/login', { method: 'POST', body: { nombreUsuario, password }, token: false }));
 
   const loginTarjeta = async ({ email, password, comercioId }) => {
     const body = { email, password };

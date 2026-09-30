@@ -49,9 +49,9 @@ export default function App() {
         <Route path="testeo" element={<AdminTesteo />} />
       </Route>
 
-      {/* 2a — Web del comercio: login + su información */}
+      {/* 2a — Web del comercio: login + su información (también login de operario) */}
       <Route path="/comercio" element={<ComercioZona />} />
-      {/* Escaneo del QR de tarjeta: pide login de comercio si hace falta */}
+      {/* Escaneo del QR de tarjeta: pide login de comercio/operario si hace falta */}
       <Route
         path="/comercio/escanear"
         element={
@@ -60,16 +60,18 @@ export default function App() {
           </Suspense>
         }
       />
-      {/* 2b — Captura: el código de tarjeta viene en la URL */}
+      {/* 2b — Captura: el código de tarjeta viene en la URL.
+          v1.8: la pueden usar el comercio Y el operario (única acción suya
+          junto con leer la tarjeta escaneada) */}
       <Route
         path="/comercio/captura/:codigo?"
         element={
-          <ExigirRol rol="comercio">
+          <ExigirRol roles={['comercio', 'operario']}>
             <ComercioCaptura />
           </ExigirRol>
         }
       />
-      {/* 2b' — Cambio de la contraseña del comercio (§5.5) */}
+      {/* 2b' — Cambio de la contraseña del comercio (§5.5): sólo comercio */}
       <Route
         path="/comercio/password"
         element={

@@ -38,7 +38,10 @@ export default function Escanear() {
   const { sesion } = useAuth();
 
   if (!sesion) return <LoginRequerido />;
-  if (sesion.role !== 'comercio') return <ExigirRol rol="comercio">{null}</ExigirRol>;
+  // v1.8: el lector es para comercio Y operario (el operario sólo esto y la
+  // captura); cualquier otro rol, fuera.
+  if (sesion.role !== 'comercio' && sesion.role !== 'operario')
+    return <ExigirRol roles={['comercio', 'operario']}>{null}</ExigirRol>;
   return <Lector />;
 }
 
@@ -51,7 +54,7 @@ function LoginRequerido() {
           <span className="marca-logo">◑</span>
           <div>
             <h1>Escanear QR de tarjeta</h1>
-            <p className="muted">Necesitas iniciar sesión como comercio para capturar puntos</p>
+            <p className="muted">Necesitas iniciar sesión de comercio u operario para capturar puntos</p>
           </div>
         </div>
         {/* onListo vacío: tras el login nos quedamos en esta misma pantalla
@@ -72,7 +75,11 @@ function LoginRequerido() {
 
 /* ── Lector de QR ── */
 function Lector() {
-  const { salir } = useAuth();
+  const { sesion, salir } = useAuth();
+  // Al operario (v1.8) sólo le interesa el lector: los accesos al panel
+  // («Mi comercio», «Capturar a mano» = selector de tarjetas) se ocultan,
+  // porque ahí el servidor le respondería 403 FORBIDDEN_ROLE.
+  const esOperario = sesion?.role === 'operario';
   const navegar = useNavigate();
 
   const [estado, setEstado] = useState('apagado'); // apagado | pidiendo | escaneando | yendo
@@ -197,12 +204,16 @@ function Lector() {
         </div>
         <div className="barra-der">
           <BotonInstalar etiqueta="Instalar app" />
-          <Link className="btn btn-ghost btn-mini" to="/comercio">
-            Mi comercio
-          </Link>
-          <Link className="btn btn-ghost btn-mini" to="/comercio/captura">
-            Capturar a mano
-          </Link>
+          {!esOperario && (
+            <Link className="btn btn-ghost btn-mini" to="/comercio">
+              Mi comercio
+            </Link>
+          )}
+          {!esOperario && (
+            <Link className="btn btn-ghost btn-mini" to="/comercio/captura">
+              Capturar a mano
+            </Link>
+          )}
           <button className="btn btn-ghost btn-mini" onClick={salir}>
             Salir
           </button>
@@ -276,11 +287,13 @@ function Lector() {
             <button className="btn btn-primario">Abrir tarjeta</button>
           </form>
 
-          <div className="chips">
-            <Link className="chip" to="/comercio/captura">
-              Elegir tarjeta de la lista
-            </Link>
-          </div>
+          {!esOperario && (
+            <div className="chips">
+              <Link className="chip" to="/comercio/captura">
+                Elegir tarjeta de la lista
+              </Link>
+            </div>
+          )}
         </div>
       </main>
     </div>

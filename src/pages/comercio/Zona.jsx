@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { api } from '../../api/client.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import { ExigirRol } from '../../components/guardas.jsx';
@@ -12,14 +12,16 @@ export default function Zona() {
   const { sesion } = useAuth();
 
   if (!sesion) return <Publico />;
+  // El operario (v1.8) sólo puede escanear y capturar: si ha ido a parar
+  // aquí, se le manda directamente a su lector en lugar de a un panel que
+  // no puede ver (el servidor le respondería 403 en todo caso).
+  if (sesion.role === 'operario') return <Navigate to="/comercio/escanear" replace />;
   if (sesion.role !== 'comercio') return <ExigirRol rol="comercio">{null}</ExigirRol>;
   return <Panel />;
 }
 
 function Publico() {
   const [recargar, setRecargar] = useState(0);
-  const params = new URLSearchParams(window.location.search);
-  const prefijo = params.get('c') || '';
 
   return (
     <div className="pagina-login">
@@ -31,7 +33,7 @@ function Publico() {
             <p className="muted">Consulta tus tarjetas y acumula puntos</p>
           </div>
         </div>
-        <FormLoginComercio key={recargar} prefijo={prefijo} />
+        <FormLoginComercio key={recargar} />
         {/* Acceso directo al lector: si no hay sesión, allí se pedirá el login */}
         <div className="accesos">
           <Link className="acceso-grande" to="/comercio/escanear">
@@ -44,8 +46,8 @@ function Publico() {
           <BotonInstalar className="btn btn-ghost btn-mini enlace-boton" />
         </div>
         <Aviso tipo="info">
-          Si llegas desde el QR de tu comercio, añade <code>?c=TU_CODIGO_LARGO</code> a esta URL y el identificador
-          quedará rellenado.
+          Entra con tu <b>nombre de usuario</b> (te lo dio el admin) y tu contraseña. Si introduces la de camarero
+          entrarás como <b>operario</b>: sólo lector de QR y captura de puntos.
         </Aviso>
         <button className="btn btn-ghost btn-mini" onClick={() => setRecargar(recargar + 1)}>
           Reiniciar formulario
@@ -121,6 +123,11 @@ function Panel() {
                     {perfil.activo === 1 ? <Badge tono="ok">Activo</Badge> : <Badge tono="mal">Inactivo</Badge>} ·{' '}
                     alta {fecha(perfil.createdAt)}
                   </p>
+                  {perfil.nombreUsuario && (
+                    <p className="muted small">
+                      Nombre de usuario: <code>{perfil.nombreUsuario}</code>
+                    </p>
+                  )}
                 </div>
                 <div className="rejilla rejilla-2">
                   <div className="mini-dato">

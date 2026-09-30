@@ -3,18 +3,30 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { Aviso, Campo } from './ui.jsx';
 
-const DESTINO = { admin: '/admin', comercio: '/comercio', tarjeta: '/tarjeta' };
+const DESTINO = {
+  admin: '/admin',
+  comercio: '/comercio',
+  operario: '/comercio/escanear',
+  tarjeta: '/tarjeta',
+};
 
 /**
- * Adónde manda el login tras autenticarse:
+ * Adónde manda el login tras autenticarse (v1.8):
  *  - admin → /admin · comercio → /comercio · tarjeta → /tarjeta
- *  - sólo se respeta un `next` si cae dentro de la propia zona del rol
- *    (p. ej. llegar al login desde /comercio/captura/3).
+ *  - **operario** → /comercio/escanear (rol nuevo: sólo escanear y capturar)
+ *  - sólo se respeta un `next` si cae dentro de la zona del rol: el operario
+ *    sólo puede volver al lector o a una captura concreta, nunca al selector
+ *    de tarjetas ni al panel.
  */
 export function destinoTrasLogin(rol, next) {
   const home = DESTINO[rol];
   if (!home) return '/';
-  return next && next.startsWith(`${home}/`) ? next : home;
+  if (!next) return home;
+  const enMiZona =
+    rol === 'operario'
+      ? next.startsWith('/comercio/escanear') || next.startsWith('/comercio/captura/')
+      : next.startsWith(`${home}/`);
+  return enMiZona ? next : home;
 }
 
 /* ───────────────────────── Admin ───────────────────────── */
@@ -58,17 +70,23 @@ export function FormLoginAdmin({ onListo }) {
   );
 }
 
-/* ──────────────────────── Comercio ──────────────────────── */
+/* ──────────────────── Comercio / operario (v1.8) ──────────────────── */
 /**
- * Acceso de comercio **sólo por código largo** (`idRandomLargo`): ya no hay
- * desplegable para elegir entre nombre del comercio y código.
- * `prefijo` precarga el código (p. ej. `/comercio?c=<idRandomLargo>`).
+ * Acceso de comercio y de operario: **mismo formulario, sólo `nombreUsuario`
+ * + `password`** (§3.3 v1.8). La contraseña decide el rol:
+ *
+ *   · contraseña de operario → `role: "operario"` → sólo lector de QR y
+ *     captura de puntos (§2 matriz de permisos)
+ *   · contraseña de comercio → `role: "comercio"` → panel completo
+ *
+ * `onListo(rol)` recibe el rol para que la pantalla que llama ramifique;
+ * sin él se navega con `destinoTrasLogin(rol, next)`.
  */
-export function FormLoginComercio({ onListo, prefijo }) {
+export function FormLoginComercio({ onListo }) {
   const { loginComercio } = useAuth();
   const navegar = useNavigate();
   const loc = useLocation();
-  const [identificador, setIdentificador] = useState(prefijo || '');
+  const [nombreUsuario, setNombreUsuario] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [enviando, setEnviando] = useState(false);
@@ -78,9 +96,9 @@ export function FormLoginComercio({ onListo, prefijo }) {
     setEnviando(true);
     setError(null);
     try {
-      await loginComercio({ password, idRandomLargo: identificador });
-      if (onListo) onListo();
-      else navegar(destinoTrasLogin('comercio', loc.state?.next), { replace: true });
+      const sesion = await loginComercio({ nombreUsuario: nombreUsuario.trim(), password });
+      if (onListo) onListo(sesion?.role);
+      else navegar(destinoTrasLogin(sesion?.role, loc.state?.next), { replace: true });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -91,18 +109,29 @@ export function FormLoginComercio({ onListo, prefijo }) {
   return (
     <form onSubmit={enviar} className="form">
       <Aviso tipo="error">{error}</Aviso>
-      <Campo
-        label="Código largo (idRandomLargo)"
-        requerido
-        hint="Te lo dio el admin; también está en tu panel y en el QR de alta"
-      >
-        <input className="input" value={identificador} onChange={(e) => setIdentificador(e.target.value)} autoFocus />
+      <Campo label="Nombre de usuario" requerido hint="3–32 caracteres: minúsculas, números y guion bajo">
+        <input
+          className="input"
+          value={nombreUsuario}
+          onChange={(e) => setNombreUsuario(e.target.value)}
+          autoComplete="username"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          autoFocus
+        />
       </Campo>
       <Campo label="Contraseña" requerido>
-        <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <input
+          className="input"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="current-password"
+        />
       </Campo>
-      <button className="btn btn-primario" disabled={enviando || !identificador || !password}>
-        {enviando ? 'Entrando…' : 'Entrar como comercio'}
+      <button className="btn btn-primario" disabled={enviando || !nombreUsuario || !password}>
+        {enviando ? 'Entrando…' : 'Entrar'}
       </button>
     </form>
   );

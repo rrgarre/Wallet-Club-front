@@ -9,7 +9,7 @@ const TABS = [
   { id: 'tarjeta', etiqueta: 'Tarjeta' },
 ];
 
-const DESTINO = { admin: '/admin', comercio: '/comercio', tarjeta: '/tarjeta' };
+const DESTINO = { admin: '/admin', comercio: '/comercio', operario: '/comercio/escanear', tarjeta: '/tarjeta' };
 
 export default function Login() {
   const loc = useLocation();
@@ -24,8 +24,10 @@ export default function Login() {
     return <Navigate to={DESTINO[sesion.role] || '/'} replace />;
   }
 
-  // Tarjeta → su página de información · Comercio → su página · Admin → su panel
-  const ir = () => navegar(destinoTrasLogin(tab, params.get('next')), { replace: true });
+  // Tarjeta → su página de información · Comercio → su panel · Admin → su panel
+  // · Operario (v1.8) → el lector de QR. `tab` sólo es la pestaña elegida: el
+  // rol de verdad lo manda el login (la contraseña de operario da `operario`).
+  const ir = (rol) => navegar(destinoTrasLogin(rol || tab, params.get('next')), { replace: true });
 
   return (
     <div className="pagina-login">
