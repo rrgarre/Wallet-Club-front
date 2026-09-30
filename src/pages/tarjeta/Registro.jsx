@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import { Aviso, Campo } from '../../components/ui.jsx';
+import { deteccionDispositivo } from '../../lib/sistema.js';
 /**
  * Código por defecto a 48 ceros: NO corresponde a ningún comercio real,
  * así la web funciona para probar y el parámetro se cambia en el navegador:
@@ -57,9 +58,15 @@ export function urlWallet(res) {
 
 export function FormRegistro({ idRandomLargo, onRegistrado, publico = false }) {
   const { registrarTarjeta } = useAuth();
-  // v1.6: sin contraseña — la pone el servidor (USUARIO_PASSWORD) y el
-  // formulario de alta ya no la pide ni la envía (API_CONTRACT §3.5).
-  const [f, setF] = useState({ nombre: '', email: '' });
+  // v1.7: `sistema` (`google` | `apple`). Detección local del SO para
+  // premarcar el desplegable (editable a mano); en ordenador ⇒ `google`,
+  // el defecto del contrato.
+  const [detectado] = useState(deteccionDispositivo);
+  const [f, setF] = useState({
+    nombre: '',
+    email: '',
+    sistema: detectado.sistema || 'google',
+  });
   const [error, setError] = useState(null);
   const [enviando, setEnviando] = useState(false);
   const [creado, setCreado] = useState(null); // respuesta del alta
@@ -68,7 +75,7 @@ export function FormRegistro({ idRandomLargo, onRegistrado, publico = false }) {
 
   const reiniciar = () => {
     setCreado(null);
-    setF({ nombre: '', email: '' });
+    setF({ nombre: '', email: '', sistema: detectado.sistema || 'google' });
     setError(null);
   };
 
@@ -80,6 +87,7 @@ export function FormRegistro({ idRandomLargo, onRegistrado, publico = false }) {
       const res = await registrarTarjeta(idRandomLargo, {
         nombre: f.nombre.trim(),
         email: f.email.trim(),
+        sistema: f.sistema,
       });
       // §3.5 (v1.6): el 201 llega SIN token → aquí NO se abre sesión: ni
       // `entrar()`, ni localStorage, ni redirección a la pantalla de usuario.
@@ -101,6 +109,10 @@ export function FormRegistro({ idRandomLargo, onRegistrado, publico = false }) {
   /* ── Alta correcta: enseñar el enlace de Google Wallet ── */
   if (creado) {
     const wallet = urlWallet(creado);
+    // v1.7: con `sistema: "apple"` el servidor responde googleWalletUrl: null
+    // y el literal informativo `mensaje: "sistema_apple"`. Todavía no hay
+    // lógica de Apple: NO se llama ni se redirige a Apple desde aquí.
+    const esApple = creado.mensaje === 'sistema_apple' || creado.usuario?.sistema === 'apple';
     return (
       <div className="alta-exito">
         <Aviso tipo="ok">
@@ -115,7 +127,12 @@ export function FormRegistro({ idRandomLargo, onRegistrado, publico = false }) {
           .
         </Aviso>
 
-        {wallet ? (
+        {esApple ? (
+          <p className="muted small">
+            Tarjeta creada en <b>sistema Apple</b>: no se toca Google Wallet y, de momento, la lógica de Apple Wallet
+            llegará en una fase posterior.
+          </p>
+        ) : wallet ? (
           <>
             <a className="btn btn-wallet" href={wallet} target="_blank" rel="noopener noreferrer">
               <span className="wallet-icono">＋</span> Añadir tarjeta a Google Wallet
@@ -154,6 +171,31 @@ export function FormRegistro({ idRandomLargo, onRegistrado, publico = false }) {
       <Campo label="Email" requerido>
         <input className="input" type="email" value={f.email} onChange={(e) => set('email', e.target.value)} />
       </Campo>
+
+      {/* v1.7: texto de detección ENCIMA del desplegable (sólo preselección) */}
+      <p className="muted small">
+        {detectado.sistema ? (
+          <>
+            Este dispositivo parece <b>{detectado.etiqueta}</b> → se enviará <code>{detectado.sistema}</code>, salvo
+            que lo cambies aquí.
+          </>
+        ) : (
+          <>
+            No se detecta móvil ({detectado.etiqueta}) → se enviará <code>google</code> por defecto.
+          </>
+        )}
+      </p>
+      <Campo
+        label="Sistema"
+        requerido
+        hint="El mismo email puede tener una tarjeta google y otra apple: son independientes"
+      >
+        <select className="input" value={f.sistema} onChange={(e) => set('sistema', e.target.value)}>
+          <option value="google">Google Wallet (Android / Google)</option>
+          <option value="apple">Apple Wallet (iPhone / iPad)</option>
+        </select>
+      </Campo>
+
       {/* Sin contraseña: la fija el servidor (contrato §3.5 v1.6) */}
       <button className="btn btn-primario" disabled={enviando || !f.nombre || !f.email}>
         {enviando ? 'Creando cuenta…' : 'Crear cuenta'}

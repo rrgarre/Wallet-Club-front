@@ -64,11 +64,15 @@ export function AuthProvider({ children }) {
    * v1.6 también: NO se envía `password` — la pone el servidor
    * (`USUARIO_PASSWORD`) y el login de tarjeta autentica con ella; si el
    * body la trae, se ignora.
+   *
+   * v1.7: `sistema` (`"google"` | `"apple"`) lo manda el formulario, ya
+   * preseleccionado según el SO. Si llegara vacío el servidor usa `google`
+   * y cualquier otro valor devuelve `400 VALIDATION`.
    */
-  const registrarTarjeta = async (idRandomLargo, { nombre, email }) =>
+  const registrarTarjeta = async (idRandomLargo, { nombre, email, sistema }) =>
     api(`/api/registro/tarjeta/${idRandomLargo}`, {
       method: 'POST',
-      body: { nombre, email },
+      body: { nombre, email, sistema },
       token: false,
     });
 

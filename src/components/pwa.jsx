@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { Modal } from './ui.jsx';
+import { plataforma } from '../lib/sistema.js';
 
 /* ──────────────────────────────────────────────────────────────────────────
  * 1 · Registro del service worker + avisos
@@ -65,18 +66,8 @@ export function RegistroPWA() {
  *     (botón en el escáner y en el acceso de comercio)
  * ────────────────────────────────────────────────────────────────────────── */
 
-/** Plataforma del navegador: ios | android | mac | windows | otro */
-function plataforma() {
-  if (typeof navigator === 'undefined') return 'otro';
-  const ua = navigator.userAgent || '';
-  const tabletaIpad = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
-  if (/iPad|iPhone|iPod/.test(ua) || tabletaIpad) return 'ios';
-  if (/Android/.test(ua)) return 'android';
-  if (/Macintosh|Mac OS X/.test(ua)) return 'mac';
-  if (/Windows/.test(ua)) return 'windows';
-  return 'otro';
-}
-
+/* La plataforma (ios/android/mac/windows/otro) vive en src/lib/sistema.js:
+   la comparte el registro de tarjeta, que con ella precarga `sistema`. */
 const PASOS = {
   ios: {
     titulo: 'iPhone y iPad (Safari)',

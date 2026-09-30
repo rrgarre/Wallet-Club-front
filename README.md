@@ -170,7 +170,7 @@ La API no expone el histórico de operaciones al comercio, sólo al admin.
 | Ruta | Contenido |
 |---|---|
 | `/tarjeta` | Login (email + contraseña; si el email está en varios comercios pide el comercio) + saldo en grande + **QR grande** que contiene **sólo el identificador** de la tarjeta (lo escanea el comercio) + historial propio |
-| `/tarjeta/registro/:idRandomLargo` | **Alta pública.** El código va en la URL y no se puede tocar desde el formulario. **Sin contraseña** (v1.6): sólo pide nombre y email, la contraseña la fija el servidor. Sin parámetro usa `0000…0000` (48 ceros), que **no** corresponde a ningún comercio real. También acepta `?c=<codigo>` |
+| `/tarjeta/registro/:idRandomLargo` | **Alta pública.** El código va en la URL y no se puede tocar desde el formulario. **Sin contraseña** (v1.6): pide nombre, email y **sistema** (`google` \| `apple`, v1.7) — la contraseña la fija el servidor; el sistema viene **preseleccionado según el SO** del dispositivo (con aviso encima del desplegable) y es editable. Sin parámetro usa `0000…0000` (48 ceros), que **no** corresponde a ningún comercio real. También acepta `?c=<codigo>` |
 
 El registro **no devuelve `token`** (v1.6): el cliente **no queda logueado** y
 el front **no abre sesión** con la respuesta (ni `entrar()`, ni nada en
@@ -181,6 +181,18 @@ Google Wallet», que abre en pestaña nueva). **No hay botón para ir a
 mano desde `/tarjeta` (login, que sí devuelve token). Tampoco se explica la
 URL: sólo se muestra el código del comercio (la ruta sigue siendo la que trae
 el navegador).
+
+**Sistema (v1.7).** El formulario manda `sistema` (`google`/`apple`), con el
+valor **preseleccionado según el SO** del dispositivo: detección local por
+User-Agent (`src/lib/sistema.js`, el mismo helper que usa la ayuda de la PWA),
+texto encima del desplegable y selección siempre editable. En ordenador no hay
+SO móvil que detectar ⇒ **`google`** (el defecto del contrato) y el aviso lo
+dice a la cara. El mismo email con `sistema` distinto son **dos tarjetas
+independientes**. Si el alta sale `apple`, la pantalla de éxito reconoce
+`mensaje: "sistema_apple"` y muestra un aviso propio en lugar del botón de
+Google Wallet — sin llamadas ni redirecciones a Apple (esa lógica llega en una
+fase posterior). El mismo campo existe también en el alta de admin
+(`/admin/alta-tarjeta`), que usa el mismo formulario.
 
 ### Destino tras el login
 `/login` y los logins individuales mandan **admin → `/admin`,
