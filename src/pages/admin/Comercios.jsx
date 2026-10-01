@@ -11,6 +11,7 @@ const VACIO = {
   operarioPassword: '',
   puntosPremio: 10,
   premioDescripcion: '',
+  maximoPremios: 0, // v1.10: techo de premios por tarjeta (0 = sin límite)
   activo: true,
 };
 
@@ -49,7 +50,8 @@ export default function Comercios() {
         <div>
           <h2>Comercios</h2>
           <p className="muted">
-            Alta y edición: nombre de usuario, contraseñas de comercio y de operario, código de registro (QR)
+            Alta y edición: nombre de usuario, contraseñas de comercio y de operario, techo de premios, código de
+            registro (QR)
           </p>
         </div>
         <button className="btn btn-primario" onClick={() => setEditando({ ...VACIO })}>
@@ -75,6 +77,7 @@ export default function Comercios() {
                 <th>Nombre de usuario</th>
                 <th className="der">Puntos/premio</th>
                 <th>Premio</th>
+                <th className="der">Máx. premios</th>
                 <th>Estado</th>
                 <th>Código de registro (idRandomLargo)</th>
                 <th>Acciones</th>
@@ -98,6 +101,15 @@ export default function Comercios() {
                   </td>
                   <td className="der num">{c.puntosPremio}</td>
                   <td>{c.premioDescripcion || '—'}</td>
+                  <td className="der num">
+                    {Number(c.maximoPremios) > 0 ? (
+                      c.maximoPremios
+                    ) : (
+                      <span className="muted" title="Sin límite: los premios nunca se recortan (v1.10, 0 = sin límite)">
+                        Sin límite
+                      </span>
+                    )}
+                  </td>
                   <td>{c.activo === 1 ? <Badge tono="ok">Activo</Badge> : <Badge tono="mal">Inactivo</Badge>}</td>
                   <td>
                     <code className="codigo" title={c.idRandomLargo}>
@@ -113,7 +125,9 @@ export default function Comercios() {
                   <td className="acciones">
                     <button
                       className="btn btn-mini"
-                      onClick={() => setEditando({ ...c, password: '', operarioPassword: '' })}
+                      onClick={() =>
+                        setEditando({ ...c, password: '', operarioPassword: '', maximoPremios: Number(c.maximoPremios) || 0 })
+                      }
                     >
                       Editar
                     </button>
@@ -199,6 +213,21 @@ function FormComercio({ valor, onCerrar, onGuardar }) {
       return;
     }
 
+    // v1.10 maximoPremios: entero ≥ 0 (0 = sin límite); negativo o no entero
+    // también lo rechaza el servidor con 400 VALIDATION (§7.3/§7.4).
+    // Un campo vacío NO vale 0: borrarlo sin querer quitaría el techo.
+    const maximoPremios = Number(f.maximoPremios);
+    if (f.maximoPremios === '' || f.maximoPremios === null || f.maximoPremios === undefined) {
+      setError('Falta el máximo de premios: escribe un número entero (0 = sin límite).');
+      setEnviando(false);
+      return;
+    }
+    if (!Number.isInteger(maximoPremios) || maximoPremios < 0) {
+      setError('El máximo de premios debe ser un número entero mayor o igual a 0 (0 = sin límite).');
+      setEnviando(false);
+      return;
+    }
+
     const body = {};
     if (f.nombre && f.nombre !== valor.nombre) body.nombre = f.nombre;
     // v1.8: el login de comercio usa `nombreUsuario` (§7.3 lo exige en el alta
@@ -208,6 +237,7 @@ function FormComercio({ valor, onCerrar, onGuardar }) {
     // v1.8: en edición, escrita = restablecer la contraseña de operario (§7.4).
     if (f.operarioPassword) body.operarioPassword = f.operarioPassword;
     if (!esEdicion || String(f.puntosPremio) !== String(valor.puntosPremio)) body.puntosPremio = Number(f.puntosPremio);
+    if (!esEdicion || maximoPremios !== Number(valor.maximoPremios ?? 0)) body.maximoPremios = maximoPremios;
     if ((f.premioDescripcion || '') !== (valor.premioDescripcion || '')) body.premioDescripcion = f.premioDescripcion;
     if (Boolean(f.activo) !== Boolean(valor.activo)) body.activo = Boolean(f.activo);
 
@@ -300,6 +330,19 @@ function FormComercio({ valor, onCerrar, onGuardar }) {
               className="input"
               value={f.premioDescripcion || ''}
               onChange={(e) => set('premioDescripcion', e.target.value)}
+            />
+          </Campo>
+          <Campo
+            label="Máximo de premios"
+            hint="Techo por tarjeta: al superarlo el servidor recorta (v1.10). 0 = sin límite"
+          >
+            <input
+              className="input"
+              type="number"
+              min="0"
+              step="1"
+              value={f.maximoPremios ?? 0}
+              onChange={(e) => set('maximoPremios', e.target.value)}
             />
           </Campo>
         </div>

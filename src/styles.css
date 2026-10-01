@@ -486,6 +486,10 @@ textarea.input { min-height: 92px; resize: vertical; line-height: 1.45; }
 .pendiente code { background: rgba(0, 0, 0, 0.25); color: #ffe9a8; }
 .pendiente em { color: #cdd9f2; font-style: normal; }
 
+/* v1.10 · techo de premios: línea fija dentro de la tarjeta de captura */
+.techo-limite { font-size: 13px; }
+.techo-limite .muted { color: #b9c8e6; }
+
 /* QR dentro de la tarjeta del cliente (/tarjeta) */
 .qr-fila {
   display: flex;
@@ -593,6 +597,30 @@ textarea.input { min-height: 92px; resize: vertical; line-height: 1.45; }
 .modal-cab { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--borde); }
 .modal-cab h3 { margin: 0; }
 .modal-cuerpo { padding: 18px 20px 22px; }
+
+/* Resumen de la operación (modal de confirmación de la captura, v1.10) */
+.resumen-op { display: flex; flex-direction: column; gap: 1px; margin-bottom: 14px; }
+.resumen-fila {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 14px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--borde);
+  font-size: 14.5px;
+}
+.resumen-fila > span { flex: 0 0 auto; }
+.resumen-fila b { text-align: right; }
+/* Canjes: la parte importante del resumen, resaltada */
+.resumen-canje {
+  background: var(--ok-fondo);
+  border: 1px solid #bfe8d1;
+  border-radius: 9px;
+  margin: 6px 0;
+  padding: 9px 10px;
+  color: var(--ok);
+}
+.resumen-canje > span { color: var(--ok); opacity: 0.85; }
 
 /* ───────────────────────── PWA ───────────────────────── */
 /* Barra fija de avisos: «lista para instalar» y «nueva versión → Recargar» */

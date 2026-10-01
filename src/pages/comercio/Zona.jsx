@@ -141,6 +141,20 @@ function Panel() {
                     <span className="muted small">Premio</span>
                     <b>{perfil.premioDescripcion || '—'}</b>
                   </div>
+                  <div className="mini-dato">
+                    {/* v1.10: 0 = sin límite → los premios nunca se recortan */}
+                    <span className="muted small">Techo de premios (por tarjeta)</span>
+                    {Number(perfil.maximoPremios) > 0 ? (
+                      <b className="num grande">{perfil.maximoPremios}</b>
+                    ) : (
+                      <b>Sin límite</b>
+                    )}
+                    <span className="muted small">
+                      {Number(perfil.maximoPremios) > 0
+                        ? 'Al superarlo, el servidor recorta el exceso'
+                        : '0 = sin recorte de premios'}
+                    </span>
+                  </div>
                 </div>
               </div>
 

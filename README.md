@@ -94,7 +94,7 @@ pestaña *Comercio* con su nombre de usuario y su contraseña de operario, y el
 | Ruta | Contenido |
 |---|---|
 | `/admin` | Resumen: `GET /health`, totales, accesos rápidos |
-| `/admin/comercios` | Listado (con **nombre de usuario**), alta (`POST`) y edición (`PATCH`): nombre, **nombre de usuario**, contraseña de comercio y **contraseña de operario** (escrita = restablecerla), puntos/premio, activo, copia del `idRandomLargo` y del enlace/QR de alta. Traduce `USUARIO_DUPLICADO` y `COMERCIO_DUPLICADO` |
+| `/admin/comercios` | Listado (con **nombre de usuario** y columna **Máx. premios**), alta (`POST`) y edición (`PATCH`): nombre, **nombre de usuario**, contraseña de comercio y **contraseña de operario** (escrita = restablecerla), puntos/premio, **máximo de premios** (v1.10, entero ≥ 0, `0` = sin límite), activo, copia del `idRandomLargo` y del enlace/QR de alta. Traduce `USUARIO_DUPLICADO` y `COMERCIO_DUPLICADO` |
 | `/admin/tarjetas` | Listado global filtrable por comercio, detalle + historial (sólo lectura: el contrato no permite editar tarjetas) |
 | `/admin/operaciones` | Buscador con filtros (comercio, tarjeta, tipo, desde/hasta) y paginación |
 | `/admin/google-wallet` | **Alta de clase en Google Wallet** (`POST /api/admin/comercios/:idRandomLargo/google-wallet/clase`): selector de comercio, URLs https, color, términos y `reviewStatus` en desplegable; muestra el `clase.id` devuelto o el aviso del error |
@@ -109,9 +109,9 @@ pestaña *Comercio* con su nombre de usuario y su contraseña de operario, y el
 ### Comercio
 | Ruta | Contenido |
 |---|---|
-| `/comercio` | Login **por `nombreUsuario` + contraseña** (v1.8: ya no sirve el `idRandomLargo`) + perfil del comercio (muestra su `nombreUsuario`) + su lista de tarjetas + **botones de acceso rápido** a *Escanear QR* y *Capturar puntos*. Un operario que llegue aquí se redirige a su lector |
+| `/comercio` | Login **por `nombreUsuario` + contraseña** (v1.8: ya no sirve el `idRandomLargo`) + perfil del comercio (muestra su `nombreUsuario` y su **techo de premios**, v1.10) + su lista de tarjetas + **botones de acceso rápido** a *Escanear QR* y *Capturar puntos*. Un operario que llegue aquí se redirige a su lector |
 | `/comercio/escanear` | **Lector de QR de tarjeta** (pide login de comercio u operario si hace falta). Para el operario se ocultan los accesos al panel (*Mi comercio*, selector de tarjetas): sólo escanea o escribe el número |
-| `/comercio/captura/:codigo` | **Captura de puntos.** `:codigo` es el id de la tarjeta; también vale `/comercio/captura?tarjeta=<id>`. Sin código, muestra el selector de tarjetas (operario: se le manda al lector). Se tolera el `403 FORBIDDEN_ROLE` del perfil (el operario no lo lee): la pantalla sigue funcionando sin umbral local |
+| `/comercio/captura/:codigo` | **Captura de puntos.** `:codigo` es el id de la tarjeta; también vale `/comercio/captura?tarjeta=<id>`. Sin código, muestra el selector de tarjetas (operario: se le manda al lector). Se tolera el `403 FORBIDDEN_ROLE` del perfil (el operario no lo lee): la pantalla sigue funcionando sin umbral local. **Techo de premios (v1.10)**: sale de `maximoPremios` de la propia tarjeta (§5.3, legible también por el operario), se muestra siempre, avisa **sin bloquear** cuando el movimiento llegaría al techo y, al confirmar, **un modal resume la operación** (canjes resaltados) antes de enviar |
 | `/comercio/password` | **Cambio de contraseña del comercio** (`PATCH /api/comercio/password`, §5.5): actual + nueva (mínimo 8) + repetición. Errores traducidos: `PASSWORD_ACTUAL_INCORRECTA`, `PASSWORDS_IGUALES` (v1.9), `VALIDATION`, `COMERCIO_INACTIVO`. Pide login de comercio |
 | `/comercio/operario-password` | **Cambio de la contraseña de operario/camarero** (`PATCH /api/comercio/operario-password`, §5.6, v1.9): *tu contraseña de comercio* (la que garantía el cambio; **nunca** se pide la de operario) + nueva de operario ×2. Pre-aviso si la nueva es igual a la tuya (`PASSWORDS_IGUALES`) y aviso de que la anterior deja de valer al instante. Sólo rol comercio (`ExigirRol`; el operario, `403 FORBIDDEN_ROLE`) |
 
@@ -154,8 +154,28 @@ La API no expone el histórico de operaciones al comercio, sólo al admin.
 - **Consumiciones**: barra siempre visible en la tarjeta azul — cada punto
   sumado y cada premio canjeado suma 1 (`3 por puntos + 1 por canje = 4
   consumiciones`); las correcciones no cuentan.
-- **Acumular y enviar una sola vez**: todo queda en un *buffer*; al pulsar
-  **Confirmar** se envía únicamente `puntosDelta` (la suma) y `premiosDelta`.
+- **Acumular y enviar una sola vez**: todo queda en un *buffer*; **Confirmar
+  ya no envía directamente** (v1.10): abre un **modal de revisión** y sólo
+  «Sí, enviar» manda `puntosDelta` (la suma) y `premiosDelta`. «Seguir
+  editando» cierra el modal **sin perder nada** del formulario (deltas,
+  descripción y código de camarero se quedan tal cual).
+- **Modal de revisión**: tarjeta, puntos (`antes → después (+delta)`),
+  premios, **canjes resaltados** (los automáticos por acumulación y los
+  hechos a mano), consumiciones, descripción y código de camarero si hay.
+  Si la operación toca el techo, el aviso se repite dentro: es el último
+  momento para canjear. El modal se abre en **cada** pulsación, incluido el
+  reenvío tras `CODIGO_CAMARERO_REQUERIDO` (misma operación, mismo resumen).
+- **Techo de premios (v1.10)**: la tarjeta trae `maximoPremios` (§5.3 —
+  funciona también para el operario, que no lee el perfil) y la respuesta
+  del movimiento lo refresca (§5.4). `0` = sin límite. Se muestra en la
+  tarjeta azul («Techo de premios: N…») y, si el movimiento simulado lo
+  supera, sale un **aviso naranja no bloqueante**: cuántos premios se
+  perderían y que lo canjees antes — **el envío se permite igual**, que el
+  servidor recortará.
+- **Recorte silencioso detectado**: el contrato no envía indicador del
+  recorte, así que al volver el `201` se comparan los premios previstos con
+  `tarjeta.premios`: si salieron menos, el aviso final pasa a naranja y
+  dice cuántos se han perdido.
 - **Conversión sólo visual**: el contador resta los puntos del umbral y suma el
   premio como hará el servidor… pero **el servidor es el que lo calcula de
   verdad**; el estado definitivo se lee de `tarjeta` de la respuesta (y de
@@ -253,7 +273,23 @@ llegar al login desde `/comercio/captura/3` vuelve a esa pantalla).
 - El cliente ya no decide cuándo enviar `nombre`: **siempre** va con el
   `deviceId`. Si el servidor rechaza una operación grande o en negativo pidiendo
   `codigoCamarero` (`CODIGO_CAMARERO_REQUERIDO`), se muestra ese campo y el
-  reenvío se hace con la misma idempotencia.
+  reenvío se hace con la misma idempotencia (y pasando otra vez por el
+  modal de revisión, que ya lleva el código en el resumen).
+- **Techo de premios (v1.10)**: `maximoPremios` es un entero ≥ 0 donde
+  **`0` = sin límite**; se da de alta y se edita en `/admin/comercios`
+  (validado en cliente: entero ≥ 0) y se muestra en el panel del comercio
+  y en la captura. Si una operación lo supera, **el front avisa** (aviso
+  naranja + repetición en el modal) **pero deja enviar**: el contrato dice
+  que el servidor **recorta en silencio** en esa misma operación y devuelve
+  `tarjeta.premios` ya recortado **sin indicador** — por eso el front
+  compara lo previsto con lo devuelto y avisa del recorte *a posteriori*.
+  El techo se lee de `GET /api/comercio/tarjetas/:id` (§5.3) porque esa
+  ruta también la puede leer el **operario** (el perfil, no).
+- **Confirmar = revisar** (v1.10): en la captura, el botón *Confirmar* abre
+  un **modal con el resumen** de la operación (destacando los canjes) y
+  sólo la aceptación envía. Cancelar vuelve a la edición **sin pérdida**
+  del formulario; la clave de idempotencia se sigue generando **al enviar**,
+  no al abrir el modal. No se aplica en `/admin/testeo` (consola de pruebas).
 
 ## Estructura
 

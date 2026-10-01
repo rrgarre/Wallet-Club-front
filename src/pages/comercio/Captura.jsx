@@ -3,7 +3,7 @@ import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../../api/client.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import { capturaPath, FRONT_BASE } from '../../config.js';
-import { Aviso, Cargando, MasOpciones } from '../../components/ui.jsx';
+import { Aviso, Cargando, MasOpciones, Modal } from '../../components/ui.jsx';
 import { deviceId, simularSaldo, uuid } from '../../lib/util.js';
 
 /**
@@ -52,6 +52,12 @@ export default function Captura() {
 
   const [enviando, setEnviando] = useState(false);
   const [aviso, setAviso] = useState(null);
+  // v1.10: techo de premios del comercio (0 = sin límite). Viene de §5.3
+  // (`maximoPremios` a nivel superior), que SÍ puede leer el operario.
+  const [maximoPremios, setMaximoPremios] = useState(0);
+  // Modal de confirmación: «Confirmar» abre el resumen; el envío sólo
+  // ocurre cuando se acepta ahí dentro.
+  const [confirmando, setConfirmando] = useState(false);
   const intento = useRef(null); // { idem, puntosDelta, premiosDelta }
 
   /* ── carga ─────────────────────────────────────────── */
@@ -64,10 +70,12 @@ export default function Captura() {
         // El perfil da el umbral de premios; el operario (v1.8) no puede
         // leerlo (403 FORBIDDEN_ROLE), así que seguimos sin umbral en vez de
         // romper la pantalla: los contadores los decide el servidor igual.
+        let perfilCargado = null;
         try {
           const p = await api('/api/comercio/perfil');
           if (!vivo) return;
-          setPerfil(p.comercio);
+          perfilCargado = p.comercio;
+          setPerfil(perfilCargado);
         } catch (e) {
           if (e.code !== 'FORBIDDEN_ROLE') throw e;
         }
@@ -77,6 +85,9 @@ export default function Captura() {
           const t = await api(`/api/comercio/tarjetas/${encodeURIComponent(codigoTarjeta)}`);
           if (!vivo) return;
           setTarjeta(t.tarjeta);
+          // v1.10: el techo viene en la propia tarjeta (§5.3), legible también
+          // para el operario; el perfil queda como respaldo.
+          setMaximoPremios(Number(t.maximoPremios ?? perfilCargado?.maximoPremios ?? 0) || 0);
         } else {
           setTarjeta(null);
           const l = await api('/api/comercio/tarjetas');
@@ -113,6 +124,27 @@ export default function Captura() {
     if (!tarjeta || puntosDelta <= 0 || umbral <= 0) return 0;
     return Math.floor((tarjeta.puntos + puntosDelta) / umbral) - Math.floor(tarjeta.puntos / umbral);
   }, [tarjeta, puntosDelta, umbral]);
+
+  /* ── v1.10 · techo de premios (§6.7) ────────────────
+     Si el resultado simulado supera `maximoPremios` (0 = sin límite), el
+     servidor lo recorta EN SILENCIO en esa misma operación y devuelve 201
+     con `tarjeta.premios` ya recortado (sin indicador). Aquí sólo Avisamos:
+     el envío nunca se bloquea, que es lo que pide el contrato. */
+  const techo = maximoPremios > 0 ? maximoPremios : 0;
+  const premiosFinales = premiosMostrar;
+  const excedeTecho = techo > 0 && premiosFinales > techo;
+  const premiosPerdidos = excedeTecho ? premiosFinales - techo : 0;
+  // ¿Este movimiento ES el que empuja por encima (pérdida de este envío)?
+  // Si no, la tarjeta ya estaba por encima (p. ej. el admin bajó el techo).
+  const esteMovimientoSuma = Boolean(tarjeta && premiosFinales > tarjeta.premios);
+  const textoTecho = !excedeTecho
+    ? null
+    : esteMovimientoSuma
+      ? `Al confirmar, los premios quedarán en el techo de ${techo}: se perderían ${premiosPerdidos}. ` +
+        `Canjea ahora los que sobran (o pide al cliente que los canjee) para no perderlos — aun así puedes enviar: el servidor recortará.`
+      : hayBuffer
+        ? `Esta operación igualará los premios al techo de ${techo}: se recortarían ${premiosPerdidos} (la tarjeta está por encima: ${premiosFinales} > ${techo}).`
+        : `Esta tarjeta ya está por encima del techo (${premiosFinales} > ${techo}): la próxima operación que envíes igualará los premios a ${techo} (se recortarían ${premiosPerdidos}).`;
 
   /* ── consumiciones de la operación en curso ──────────
      Sumar puntos y canjear premios SUMAN consumición:
@@ -152,10 +184,15 @@ export default function Captura() {
   /* ── envío ─────────────────────────────────────────── */
   const enviar = async () => {
     if (!tarjeta) return;
+    setConfirmando(false); // el resumen ya se aceptó: se va a enviar
     if (puntosDelta === 0 && premiosDelta === 0) {
       setAviso({ tipo: 'error', texto: 'La operación no cambia nada: suma o resta algo antes de confirmar.' });
       return;
     }
+
+    // v1.10: lo previsto ANTES de enviar, para detectar si el servidor
+    // recortó al techo (§6.7 lo hace sin indicador en la respuesta).
+    const premiosPrevistos = premiosMostrar;
 
     // `nombre` SIEMPRE va: lo rellena el navegador con el id del dispositivo.
     const body = { puntosDelta, premiosDelta, nombre: deviceId() };
@@ -178,18 +215,33 @@ export default function Captura() {
       });
 
       // El servidor es autoritativo: su `tarjeta` manda.
+      // v1.10: la respuesta trae `maximoPremios` (§5.4) → refrescamos el techo.
+      if (res.maximoPremios !== undefined) setMaximoPremios(Number(res.maximoPremios) || 0);
       if (res.tarjeta) setTarjeta(res.tarjeta);
 
+      // v1.10: el recorte al techo es silencioso: lo deducimos comparando lo
+      // que aquí habíamos previsto con el saldo que devuelve el servidor.
+      const techoRespuesta = Number(res.maximoPremios ?? maximoPremios) || 0;
+      const recortados =
+        techoRespuesta > 0 && res.tarjeta && res.tarjeta.premios < premiosPrevistos
+          ? premiosPrevistos - res.tarjeta.premios
+          : 0;
+
+      let textoAviso;
+      let tipoAviso = 'ok';
       if (res.duplicado) {
-        setAviso({ tipo: 'info', texto: res.mensaje || 'Operación ya registrada previamente: no se aplicó de nuevo.' });
+        tipoAviso = 'info';
+        textoAviso = res.mensaje || 'Operación ya registrada previamente: no se aplicó de nuevo.';
       } else if (res.conversion) {
-        setAviso({
-          tipo: 'ok',
-          texto: `¡Premio conseguido! +${res.conversion.n} premio(s) · se descontaron ${res.conversion.puntosDescontados} puntos (umbral ${res.conversion.umbral}).`,
-        });
+        textoAviso = `¡Premio conseguido! +${res.conversion.n} premio(s) · se descontaron ${res.conversion.puntosDescontados} puntos (umbral ${res.conversion.umbral}).`;
       } else {
-        setAviso({ tipo: 'ok', texto: 'Movimiento registrado.' });
+        textoAviso = 'Movimiento registrado.';
       }
+      if (recortados > 0) {
+        tipoAviso = 'warn';
+        textoAviso += ` Atención: el servidor ha recortado los premios al techo de ${techoRespuesta} (perdiste ${recortados}).`;
+      }
+      setAviso({ tipo: tipoAviso, texto: textoAviso });
 
       setPuntosDelta(0);
       setPremiosDelta(0);
@@ -321,7 +373,19 @@ export default function Captura() {
             </span>
           </div>
         </div>
+
+        {/* v1.10: el techo del comercio, siempre a la vista */}
+        <div className="techo-limite">
+          <span className="muted small">
+            {techo > 0
+              ? `Techo de premios: ${techo} por tarjeta — si una operación lo supera, el servidor recorta el exceso.`
+              : 'Techo de premios: sin límite (0 = nunca se recortan).'}
+          </span>
+        </div>
       </div>
+
+      {/* v1.10: aviso NO bloqueante de pérdida por techo (el envío se permite) */}
+      <Aviso tipo="warn">{textoTecho}</Aviso>
 
       {/* ── CONTROLES MINIMALISTAS ── */}
       <div className="controles">
@@ -357,7 +421,7 @@ export default function Captura() {
                   </code>
                 )}
                 {generados > 0 && <b className="premio-info">🎉 +{generados} premio(s)</b>}
-                <em>· se envía al confirmar</em>
+                <em>· lo revisas antes de enviar</em>
               </span>
             )}
           </div>
@@ -490,7 +554,7 @@ export default function Captura() {
         <div className="pie-controles">
           <button
             className="btn btn-primario btn-confirmar"
-            onClick={enviar}
+            onClick={() => setConfirmando(true)}
             disabled={enviando || (puntosDelta === 0 && premiosDelta === 0)}
           >
             {enviando ? 'Enviando…' : 'Confirmar'}
@@ -507,6 +571,85 @@ export default function Captura() {
           </Link>
         </div>
       </div>
+
+      {/* ── v1.10 · CONFIRMACIÓN INTERMEDIA ──────────────
+         «Confirmar» ya no envía: abre este resumen. «Seguir editando»
+         cierra sin tocar el buffer (deltas, descripción y código intactos);
+         «Sí, enviar» es el que realmente dispara el movimiento. */}
+      {confirmando && (
+        <Modal titulo="Revisar antes de enviar" onCerrar={() => setConfirmando(false)}>
+          <div className="resumen-op">
+            <div className="resumen-fila">
+              <span className="muted">Tarjeta</span>
+              <b>
+                #{tarjeta.id} · {tarjeta.nombre}
+              </b>
+            </div>
+            <div className="resumen-fila">
+              <span className="muted">Puntos</span>
+              <b className="num">
+                {puntosDelta === 0
+                  ? `${tarjeta.puntos} (sin cambios)`
+                  : `${tarjeta.puntos} → ${puntosMostrar} (${puntosDelta > 0 ? '+' : ''}${puntosDelta})`}
+              </b>
+            </div>
+            <div className="resumen-fila">
+              <span className="muted">Premios</span>
+              <b className="num">
+                {premiosDelta === 0
+                  ? `${tarjeta.premios} (sin cambios)`
+                  : `${tarjeta.premios} → ${premiosMostrar} (${premiosDelta > 0 ? '+' : ''}${premiosDelta})`}
+              </b>
+            </div>
+            {generados > 0 && (
+              <div className="resumen-fila resumen-canje">
+                <span className="muted">Canjes por acumulación</span>
+                <b>
+                  🎉 +{generados} premio{generados === 1 ? '' : 's'} al sumar {puntosDelta} punto
+                  {puntosDelta === 1 ? '' : 's'}
+                </b>
+              </div>
+            )}
+            {canjesConsumidos > 0 && (
+              <div className="resumen-fila resumen-canje">
+                <span className="muted">Canjes a mano</span>
+                <b>
+                  🎟️ −{canjesConsumidos} premio{canjesConsumidos === 1 ? '' : 's'} (se canjea
+                  {canjesConsumidos === 1 ? '' : 'n'} ahora)
+                </b>
+              </div>
+            )}
+            <div className="resumen-fila">
+              <span className="muted">Consumiciones</span>
+              <b>{resumenConsumicion}</b>
+            </div>
+            {descripcion.trim() && (
+              <div className="resumen-fila">
+                <span className="muted">Descripción</span>
+                <b>{descripcion.trim()}</b>
+              </div>
+            )}
+            {codigoCamarero.trim() && (
+              <div className="resumen-fila">
+                <span className="muted">Código de camarero</span>
+                <b className="num">{codigoCamarero.trim()}</b>
+              </div>
+            )}
+          </div>
+
+          {/* El aviso de techo se repite aquí: es el último momento para canjear */}
+          <Aviso tipo="warn">{textoTecho}</Aviso>
+
+          <div className="form-pie">
+            <button className="btn btn-ghost" onClick={() => setConfirmando(false)} disabled={enviando}>
+              Seguir editando
+            </button>
+            <button className="btn btn-primario" onClick={enviar} disabled={enviando}>
+              {enviando ? 'Enviando…' : 'Sí, enviar'}
+            </button>
+          </div>
+        </Modal>
+      )}
     </Cuerpo>
   );
 }
