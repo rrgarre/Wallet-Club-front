@@ -52,12 +52,17 @@ export default function Captura() {
 
   const [enviando, setEnviando] = useState(false);
   const [aviso, setAviso] = useState(null);
-  // v1.10: techo de premios del comercio (0 = sin límite). Viene de §5.3
-  // (`maximoPremios` a nivel superior), que SÍ puede leer el operario.
+  // v1.10/v1.11: umbral y techo del comercio. Vienen de §5.3 (`tarjeta`)
+  // y se refrescan con §5.4 (respuesta del movimiento): así los tiene TAMBIÉN
+  // el operario, que no puede leer el perfil (403).
+  const [puntosPremio, setPuntosPremio] = useState(0);
   const [maximoPremios, setMaximoPremios] = useState(0);
   // Modal de confirmación: «Confirmar» abre el resumen; el envío sólo
   // ocurre cuando se acepta ahí dentro.
   const [confirmando, setConfirmando] = useState(false);
+  // v1.11: modal «Tope alcanzado», una sola vez por entrada en el estado.
+  const [modalTope, setModalTope] = useState(false);
+  const topeAvisado = useRef(false);
   const intento = useRef(null); // { idem, puntosDelta, premiosDelta }
 
   /* ── carga ─────────────────────────────────────────── */
@@ -80,13 +85,20 @@ export default function Captura() {
           if (e.code !== 'FORBIDDEN_ROLE') throw e;
         }
 
+        // v1.11: umbral y techo del comercio (§5.1) — sirven para marcar «tope»
+        // en el listado (§5.2 trae puntos/premios de cada tarjeta). Al abrir una
+        // tarjeta se refrescan con §5.3, que sí lo da también al operario.
+        setPuntosPremio(Number(perfilCargado?.puntosPremio ?? 0) || 0);
+        setMaximoPremios(Number(perfilCargado?.maximoPremios ?? 0) || 0);
+
         if (codigoTarjeta) {
           setLista(null);
           const t = await api(`/api/comercio/tarjetas/${encodeURIComponent(codigoTarjeta)}`);
           if (!vivo) return;
           setTarjeta(t.tarjeta);
-          // v1.10: el techo viene en la propia tarjeta (§5.3), legible también
-          // para el operario; el perfil queda como respaldo.
+          // v1.11: umbral y techo en la propia tarjeta (§5.3), legibles
+          // también para el operario; el perfil queda como respaldo.
+          setPuntosPremio(Number(t.puntosPremio ?? perfilCargado?.puntosPremio ?? 0) || 0);
           setMaximoPremios(Number(t.maximoPremios ?? perfilCargado?.maximoPremios ?? 0) || 0);
         } else {
           setTarjeta(null);
@@ -107,44 +119,69 @@ export default function Captura() {
     };
   }, [codigoTarjeta]);
 
-  const umbral = (perfil && perfil.puntosPremio) || 0;
+  const umbral = puntosPremio; // §5.3 / §5.4 (0 mientras no venga)
+  const techo = maximoPremios > 0 ? maximoPremios : 0;
 
   /* ── simulación sólo visual ────────────────────────── */
   const previo = useMemo(() => {
     if (!tarjeta) return null;
-    return simularSaldo(tarjeta.puntos, tarjeta.premios, puntosDelta, premiosDelta, umbral);
-  }, [tarjeta, puntosDelta, premiosDelta, umbral]);
+    return simularSaldo(tarjeta.puntos, tarjeta.premios, puntosDelta, premiosDelta, umbral, techo);
+  }, [tarjeta, puntosDelta, premiosDelta, umbral, techo]);
 
   const hayBuffer = puntosDelta !== 0 || premiosDelta > 0;
   const puntosMostrar = previo ? previo.puntos : tarjeta ? tarjeta.puntos : 0;
   const premiosMostrar = previo ? previo.premios : tarjeta ? tarjeta.premios : 0;
 
-  /** Premios que SE GENERARÍAN al confirmar (sólo visual; luego manda el servidor) */
-  const generados = useMemo(() => {
-    if (!tarjeta || puntosDelta <= 0 || umbral <= 0) return 0;
-    return Math.floor((tarjeta.puntos + puntosDelta) / umbral) - Math.floor(tarjeta.puntos / umbral);
-  }, [tarjeta, puntosDelta, umbral]);
+  /** Premios que SE GENERARÍAN al confirmar. Lo decide la propia simulación
+   * (§6.8: con los premios en el techo, la conversión no se produce). */
+  const generados = previo ? previo.generados : 0;
 
-  /* ── v1.10 · techo de premios (§6.7) ────────────────
-     Si el resultado simulado supera `maximoPremios` (0 = sin límite), el
-     servidor lo recorta EN SILENCIO en esa misma operación y devuelve 201
-     con `tarjeta.premios` ya recortado (sin indicador). Aquí sólo Avisamos:
-     el envío nunca se bloquea, que es lo que pide el contrato. */
-  const techo = maximoPremios > 0 ? maximoPremios : 0;
-  const premiosFinales = premiosMostrar;
-  const excedeTecho = techo > 0 && premiosFinales > techo;
-  const premiosPerdidos = excedeTecho ? premiosFinales - techo : 0;
-  // ¿Este movimiento ES el que empuja por encima (pérdida de este envío)?
-  // Si no, la tarjeta ya estaba por encima (p. ej. el admin bajó el techo).
-  const esteMovimientoSuma = Boolean(tarjeta && premiosFinales > tarjeta.premios);
-  const textoTecho = !excedeTecho
-    ? null
-    : esteMovimientoSuma
-      ? `Al confirmar, los premios quedarán en el techo de ${techo}: se perderían ${premiosPerdidos}. ` +
-        `Canjea ahora los que sobran (o pide al cliente que los canjee) para no perderlos — aun así puedes enviar: el servidor recortará.`
-      : hayBuffer
-        ? `Esta operación igualará los premios al techo de ${techo}: se recortarían ${premiosPerdidos} (la tarjeta está por encima: ${premiosFinales} > ${techo}).`
-        : `Esta tarjeta ya está por encima del techo (${premiosFinales} > ${techo}): la próxima operación que envíes igualará los premios a ${techo} (se recortarían ${premiosPerdidos}).`;
+  /* ── v1.11 · estados de tope (§6.8) ──────────────────
+     «En el techo»: los premios valen ya `maximoPremios` (los incrementos de
+     premio se absorben en el servidor).
+     «En tope»: además los puntos están en `puntosPremio - 1` — el estado
+     exacto del contrato: TODO lo que suba queda absorbido. El estado se
+     mira SIEMPRE sobre el saldo guardado (la tarjeta), no sobre el buffer. */
+  const enTecho = techo > 0 && Boolean(tarjeta) && tarjeta.premios >= techo;
+  const enTope = enTecho && umbral > 0 && tarjeta.puntos >= umbral - 1;
+  // (los puntos que faltan para el tope se muestran en el contador de Puntos)
+
+  /* ── límites del buffer: nunca proponemos lo que el servidor va a
+     ignorar (§6.7 recorte de premios / §6.8 puntos congelados) ── */
+  const premiosMaximos = techo > 0 ? techo : Infinity;
+  const enTechoBuffer = techo > 0 && Boolean(tarjeta) && tarjeta.premios + premiosDelta >= techo;
+  const puntosMaximos = enTechoBuffer && umbral > 0 ? umbral - 1 : Infinity;
+  const puedeSumarPuntos = (n) => Boolean(tarjeta) && tarjeta.puntos + puntosDelta + n <= puntosMaximos;
+  const puedeSumarPremios = (n) => Boolean(tarjeta) && tarjeta.premios + premiosDelta + n <= premiosMaximos;
+
+  /* ¿Este envío dejaría la tarjeta ya en tope? (aviso en el modal de revisión) */
+  const quedaraEnTope =
+    techo > 0 && umbral > 0 && Boolean(previo) && previo.premios >= techo && previo.puntos >= umbral - 1;
+
+  /* ── avisos de techo: el envío NUNCA se bloquea aquí; sólo informamos.
+     (El incremento, en cambio, sí está cortado por los límites de arriba.) */
+  const avisosTecho = [
+    techo > 0 &&
+      tarjeta &&
+      tarjeta.premios > techo &&
+      `Esta tarjeta está por encima del techo (${tarjeta.premios} > ${techo}): al enviar, el servidor igualará los premios a ${techo}.`,
+    !enTope &&
+      quedaraEnTope &&
+      `Al enviar, la tarjeta quedará EN TOPE (${techo} premios y ${umbral - 1} puntos): a partir de ahí no acepta más incrementos, sólo canjes.`,
+    enTope &&
+      'La tarjeta está EN TOPE: puntos y premios congelados — sólo se aplican las operaciones que restan (canjear un premio la vuelve a poner en marcha).',
+  ].filter(Boolean);
+
+  /* v1.11: modal «Tope alcanzado» — una sola vez por entrada en el estado
+     (al cargar una tarjeta que ya está, o al dejarla en tope con un envío). */
+  useEffect(() => {
+    if (enTope && !topeAvisado.current) {
+      topeAvisado.current = true;
+      setModalTope(true);
+    } else if (!enTope) {
+      topeAvisado.current = false;
+    }
+  }, [enTope]);
 
   /* ── consumiciones de la operación en curso ──────────
      Sumar puntos y canjear premios SUMAN consumición:
@@ -169,8 +206,16 @@ export default function Captura() {
   const restarPuntosOK = cantidadPuntos > 0 && puntosMostrar - cantidadPuntos >= 0;
   const restarPremiosOK = cantidadPremios > 0 && premiosMostrar - cantidadPremios >= 0;
 
-  const sumarPuntos = (n) => setPuntosDelta((v) => (tarjeta && tarjeta.puntos + v + n < 0 ? v : v + n));
-  const sumarPremios = (n) => setPremiosDelta((v) => (tarjeta && tarjeta.premios + v + n < 0 ? v : v + n));
+  // Ni negativos ni por encima de lo que el servidor aplicaría (techo de
+  // premios / puntos congelados en tope): el botón ni siquiera llega a sumar.
+  const sumarPuntos = (n) =>
+    setPuntosDelta((v) =>
+      tarjeta && tarjeta.puntos + v + n >= 0 && tarjeta.puntos + v + n <= puntosMaximos ? v + n : v
+    );
+  const sumarPremios = (n) =>
+    setPremiosDelta((v) =>
+      tarjeta && tarjeta.premios + v + n >= 0 && tarjeta.premios + v + n <= premiosMaximos ? v + n : v
+    );
   const limpiar = () => {
     setPuntosDelta(0);
     setPremiosDelta(0);
@@ -190,9 +235,10 @@ export default function Captura() {
       return;
     }
 
-    // v1.10: lo previsto ANTES de enviar, para detectar si el servidor
-    // recortó al techo (§6.7 lo hace sin indicador en la respuesta).
-    const premiosPrevistos = premiosMostrar;
+    // v1.10/v1.11: saldo previo ANTES de enviar, para deducir después lo que
+    // el servidor hizo en silencio (recorte al techo / subidas absorbidas).
+    const puntosPrevistos = tarjeta.puntos;
+    const premiosPrevistos = tarjeta.premios;
 
     // `nombre` SIEMPRE va: lo rellena el navegador con el id del dispositivo.
     const body = { puntosDelta, premiosDelta, nombre: deviceId() };
@@ -215,31 +261,52 @@ export default function Captura() {
       });
 
       // El servidor es autoritativo: su `tarjeta` manda.
-      // v1.10: la respuesta trae `maximoPremios` (§5.4) → refrescamos el techo.
-      if (res.maximoPremios !== undefined) setMaximoPremios(Number(res.maximoPremios) || 0);
+      // v1.11: la respuesta trae `puntosPremio` y `maximoPremios` (§5.4).
+      const techoRespuesta = Number(res.maximoPremios ?? maximoPremios) || 0;
+      const umbralRespuesta = Number(res.puntosPremio ?? puntosPremio) || 0;
+      if (res.puntosPremio !== undefined) setPuntosPremio(umbralRespuesta);
+      if (res.maximoPremios !== undefined) setMaximoPremios(techoRespuesta);
       if (res.tarjeta) setTarjeta(res.tarjeta);
 
-      // v1.10: el recorte al techo es silencioso: lo deducimos comparando lo
-      // que aquí habíamos previsto con el saldo que devuelve el servidor.
-      const techoRespuesta = Number(res.maximoPremios ?? maximoPremios) || 0;
-      const recortados =
-        techoRespuesta > 0 && res.tarjeta && res.tarjeta.premios < premiosPrevistos
-          ? premiosPrevistos - res.tarjeta.premios
-          : 0;
+      // v1.10/v1.11: lo que el servidor hace "en silencio" se deduce
+      // comparando el saldo previo con el que devuelve.
+      const subia = puntosDelta > 0 || premiosDelta > 0;
+      const absorbida = Boolean(
+        subia && res.tarjeta && res.tarjeta.puntos === puntosPrevistos && res.tarjeta.premios === premiosPrevistos
+      );
+      const igualado = Boolean(
+        techoRespuesta > 0 &&
+          res.tarjeta &&
+          res.tarjeta.premios === techoRespuesta &&
+          premiosPrevistos > techoRespuesta
+      );
+      const enTopeRespuesta = Boolean(
+        techoRespuesta > 0 &&
+          umbralRespuesta > 0 &&
+          res.tarjeta &&
+          res.tarjeta.premios >= techoRespuesta &&
+          res.tarjeta.puntos >= umbralRespuesta - 1
+      );
 
       let textoAviso;
       let tipoAviso = 'ok';
       if (res.duplicado) {
         tipoAviso = 'info';
         textoAviso = res.mensaje || 'Operación ya registrada previamente: no se aplicó de nuevo.';
+      } else if (absorbida) {
+        tipoAviso = 'warn';
+        textoAviso = 'Operación sin efecto: la tarjeta está en tope y el servidor absorbe las subidas.';
       } else if (res.conversion) {
         textoAviso = `¡Premio conseguido! +${res.conversion.n} premio(s) · se descontaron ${res.conversion.puntosDescontados} puntos (umbral ${res.conversion.umbral}).`;
       } else {
         textoAviso = 'Movimiento registrado.';
       }
-      if (recortados > 0) {
+      if (igualado) {
         tipoAviso = 'warn';
-        textoAviso += ` Atención: el servidor ha recortado los premios al techo de ${techoRespuesta} (perdiste ${recortados}).`;
+        textoAviso += ` Atención: el servidor ha igualado los premios al techo de ${techoRespuesta} (había ${premiosPrevistos}).`;
+      }
+      if (enTopeRespuesta && !absorbida) {
+        textoAviso += ` La tarjeta ha quedado EN TOPE: ${techoRespuesta} premios y ${umbralRespuesta - 1} puntos congelados.`;
       }
       setAviso({ tipo: tipoAviso, texto: textoAviso });
 
@@ -282,11 +349,20 @@ export default function Captura() {
           {lista && lista.length === 0 && <p className="muted">No tienes tarjetas todavía.</p>}
           {lista && lista.length > 0 && (
             <div className="chips">
-              {lista.map((t) => (
-                <Link key={t.id} className="chip" to={capturaPath(t.id)}>
-                  #{t.id} · {t.nombre} · {t.puntos} pts
-                </Link>
-              ))}
+              {lista.map((t) => {
+                // v1.11: el tope se calcula aquí mismo (perfil §5.1 + saldos §5.2)
+                const enTope =
+                  techo > 0 && umbral > 0 && t.premios >= techo && t.puntos >= umbral - 1;
+                return (
+                  <Link
+                    key={t.id}
+                    className={`chip${enTope ? ' chip-tope' : ''}`}
+                    to={capturaPath(t.id)}
+                  >
+                    #{t.id} · {t.nombre} · {t.puntos} pts{enTope ? ' · 🔒 tope' : ''}
+                  </Link>
+                );
+              })}
             </div>
           )}
           <Link className="btn btn-ghost" to="/comercio">
@@ -341,11 +417,15 @@ export default function Captura() {
             <span className="contador-etiqueta">Puntos</span>
             <b className={`contador-valor ${hayBuffer && puntosDelta !== 0 ? 'editando' : ''}`}>{puntosMostrar}</b>
             <span className="contador-sub">
-              {umbral > 0
-                ? hayBuffer
-                  ? `de ${umbral} para el premio (simulado)`
-                  : `faltan ${Math.max(0, umbral - puntosMostrar)} para el premio`
-                : 'sin umbral de premio'}
+              {enTope
+                ? `TOPE: congelado en ${umbral - 1} puntos`
+                : enTecho && umbral > 0
+                  ? `faltan ${Math.max(0, umbral - 1 - puntosMostrar)} puntos para el tope (máx. ${umbral - 1})`
+                  : umbral > 0
+                    ? hayBuffer
+                      ? `de ${umbral} para el premio (simulado)`
+                      : `faltan ${Math.max(0, umbral - puntosMostrar)} para el premio`
+                    : 'sin umbral de premio'}
             </span>
           </div>
 
@@ -374,25 +454,36 @@ export default function Captura() {
           </div>
         </div>
 
-        {/* v1.10: el techo del comercio, siempre a la vista */}
+        {/* v1.10/v1.11: el techo del comercio, siempre a la vista */}
         <div className="techo-limite">
           <span className="muted small">
             {techo > 0
-              ? `Techo de premios: ${techo} por tarjeta — si una operación lo supera, el servidor recorta el exceso.`
+              ? enTope
+                ? `Techo de premios: ${techo} — TOPE ALCANZADO (${tarjeta.premios} premios · ${tarjeta.puntos} puntos): sólo se aceptan canjes hasta que se descongele.`
+                : `Techo de premios: ${techo} por tarjeta — con los premios en el techo, los puntos no superan ${umbral > 0 ? umbral - 1 : 'umbral − 1'}.`
               : 'Techo de premios: sin límite (0 = nunca se recortan).'}
           </span>
         </div>
       </div>
 
-      {/* v1.10: aviso NO bloqueante de pérdida por techo (el envío se permite) */}
-      <Aviso tipo="warn">{textoTecho}</Aviso>
+      {/* v1.10/v1.11: avisos NO bloqueantes de techo (el envío se permite) */}
+      {avisosTecho.map((t, i) => (
+        <Aviso key={i} tipo="warn">
+          {t}
+        </Aviso>
+      ))}
 
       {/* ── CONTROLES MINIMALISTAS ── */}
       <div className="controles">
         {/* FILA 1 · PUNTOS */}
         <div className="fila-controles">
           <span className="etiqueta">Puntos</span>
-          <button className="btn-grande" onClick={() => sumarPuntos(1)} title="Sumar un punto">
+          <button
+            className="btn-grande"
+            onClick={() => sumarPuntos(1)}
+            disabled={!puedeSumarPuntos(1)}
+            title={puedeSumarPuntos(1) ? 'Sumar un punto' : 'Tope de puntos: ya no caben más'}
+          >
             +1
           </button>
           {puedeRestarPuntos && (
@@ -404,7 +495,11 @@ export default function Captura() {
           {/* Cuadro de información FIJO: ya está desde el principio y no mueve los botones */}
           <div className="info-fija">
             {!hayBuffer ? (
-              <span className="muted">Sin cambios pendientes: pulsa +1 para sumar puntos.</span>
+              <span className="muted">
+                {!puedeSumarPuntos(1)
+                  ? `Tope de puntos: ya no caben más (congelado en ${umbral - 1}). Canjea un premio para descongelar.`
+                  : 'Sin cambios pendientes: pulsa +1 para sumar puntos.'}
+              </span>
             ) : (
               <span className="info-fija-contenido">
                 <b>Pendiente:</b>
@@ -439,7 +534,7 @@ export default function Captura() {
             <div className="mas-opciones-acciones">
               <button
                 className="btn btn-primario btn-mini"
-                disabled={!(cantidadPuntos > 0)}
+                disabled={!(cantidadPuntos > 0) || !puedeSumarPuntos(cantidadPuntos)}
                 onClick={() => sumarPuntos(cantidadPuntos)}
               >
                 Sumar
@@ -454,7 +549,12 @@ export default function Captura() {
                 </button>
               )}
             </div>
-            {!puedeRestarPuntos ? (
+            {!puedeSumarPuntos(cantidadPuntos) ? (
+              <p className="muted small">
+                Tope de puntos: con los premios en el techo sólo caben {puntosMaximos} puntos
+                {hayBuffer ? ` (ahora mismo irías a ${tarjeta.puntos + puntosDelta})` : ''}.
+              </p>
+            ) : !puedeRestarPuntos ? (
               <p className="muted small">Con 0 puntos no se puede restar: no se permiten valores negativos.</p>
             ) : !restarPuntosOK ? (
               <p className="muted small">Sólo hay {puntosMostrar} puntos disponibles.</p>
@@ -476,7 +576,12 @@ export default function Captura() {
           <MasOpciones>
             <span className="campo-label">Premio a mano</span>
             <div className="mas-opciones-acciones">
-              <button className="btn btn-mini" onClick={() => sumarPremios(1)}>
+              <button
+                className="btn btn-mini"
+                disabled={!puedeSumarPremios(1)}
+                onClick={() => sumarPremios(1)}
+                title={puedeSumarPremios(1) ? 'Añadir un premio' : 'Techo de premios alcanzado'}
+              >
                 +1 premio
               </button>
               {puedeRestarPremios && (
@@ -485,8 +590,16 @@ export default function Captura() {
                 </button>
               )}
             </div>
-            {!puedeRestarPremios && (
-              <p className="muted small">Con 0 premios no se puede restar: no se permiten valores negativos.</p>
+            {!puedeSumarPremios(1) ? (
+              <p className="muted small">
+                {techo > 0
+                  ? `Techo de premios alcanzado (${tarjeta.premios} de ${techo}): no se admiten más premios — el servidor los ignoraría.`
+                  : 'No se admiten más premios.'}
+              </p>
+            ) : (
+              !puedeRestarPremios && (
+                <p className="muted small">Con 0 premios no se puede restar: no se permiten valores negativos.</p>
+              )
             )}
 
             <span className="campo-label">Varios premios</span>
@@ -501,7 +614,7 @@ export default function Captura() {
             <div className="mas-opciones-acciones">
               <button
                 className="btn btn-primario btn-mini"
-                disabled={!(cantidadPremios > 0)}
+                disabled={!(cantidadPremios > 0) || !puedeSumarPremios(cantidadPremios)}
                 onClick={() => sumarPremios(cantidadPremios)}
               >
                 Añadir
@@ -516,9 +629,11 @@ export default function Captura() {
                 </button>
               )}
             </div>
-            {puedeRestarPremios && !restarPremiosOK && (
+            {!puedeSumarPremios(cantidadPremios) ? (
+              <p className="muted small">Sólo caben {Math.max(0, premiosMaximos - (tarjeta.premios + premiosDelta))} premios más hasta el techo de {techo}.</p>
+            ) : puedeRestarPremios && !restarPremiosOK ? (
               <p className="muted small">Sólo hay {premiosMostrar} premios disponibles.</p>
-            )}
+            ) : null}
             <p className="muted small">Los premios modificados a mano SÍ se envían al servidor.</p>
           </MasOpciones>
 
@@ -638,7 +753,11 @@ export default function Captura() {
           </div>
 
           {/* El aviso de techo se repite aquí: es el último momento para canjear */}
-          <Aviso tipo="warn">{textoTecho}</Aviso>
+          {avisosTecho.map((t, i) => (
+            <Aviso key={i} tipo="warn">
+              {t}
+            </Aviso>
+          ))}
 
           <div className="form-pie">
             <button className="btn btn-ghost" onClick={() => setConfirmando(false)} disabled={enviando}>
@@ -646,6 +765,44 @@ export default function Captura() {
             </button>
             <button className="btn btn-primario" onClick={enviar} disabled={enviando}>
               {enviando ? 'Enviando…' : 'Sí, enviar'}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── v1.11 · MODAL «TOPE ALCANZADO» ──────────────
+         Sólo cuando la tarjeta ENTRA en tope (al cargar ya en él, o porque un
+         movimiento la deja ahí): una sola vez por entrada hasta que se salga. */}
+      {modalTope && tarjeta && (
+        <Modal titulo="Tope de premios alcanzado" onCerrar={() => setModalTope(false)}>
+          <div className="tope-contenido">
+            <p>
+              <b>La tarjeta ha llegado a su tope de puntos:</b> ya no puede acumular más.
+            </p>
+            <div className="resumen-op">
+              <div className="resumen-fila">
+                <span className="muted">Premios</span>
+                <b className="num">
+                  {tarjeta.premios} de {techo} (en el techo)
+                </b>
+              </div>
+              <div className="resumen-fila">
+                <span className="muted">Puntos</span>
+                <b className="num">
+                  {tarjeta.puntos} = {umbral} − 1 (congelado)
+                </b>
+              </div>
+            </div>
+            <p className="muted small">
+              Los botones de sumar quedan desactivados: el servidor absorbería esas subidas sin
+              mover los saldos. Para volver a ponerla en marcha basta con <b>canjear un premio</b> (o
+              restar premios): al bajar del techo la tarjeta se descongela y los puntos vuelven a
+              convertirse en premios.
+            </p>
+          </div>
+          <div className="form-pie">
+            <button className="btn btn-primario" onClick={() => setModalTope(false)}>
+              Entendido
             </button>
           </div>
         </Modal>

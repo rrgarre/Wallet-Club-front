@@ -32,16 +32,27 @@ export function deviceId() {
 }
 
 /**
- * Sólo VISUAL: simula lo que el servidor hará con los puntos
+ * Sólo VISUAL: simula lo que el servidor hará con los puntos y los premios
  * (n = floor(puntos / puntosPremio) premios, descontando n * umbral).
- * El paquete enviado al servidor es únicamente la suma de puntos:
- * la conversión definitiva la calcula el servidor y se lee de `tarjeta` de la respuesta.
+ * El paquete enviado al servidor es únicamente la suma de puntos: la
+ * conversión definitiva la calcula el servidor y se lee de `tarjeta` de la
+ * respuesta.
+ *
+ * `tope` (v1.10/v1.11, 0 = sin límite) replica §6.7 y §6.8 del contrato:
+ *  - Si el resultado queda con los premios EN el techo, los puntos NO se
+ *    convierten y no pasan de `umbral - 1` («tope de puntos»: el resto se
+ *    absorbe en silencio).
+ *  - Los premios nunca se quedan por encima del techo (se recortan).
+ * Con `tope = 0` el comportamiento es el histórico de siempre.
  */
-export function simularSaldo(puntos, premios, puntosDelta, premiosDelta, umbral) {
+export function simularSaldo(puntos, premios, puntosDelta, premiosDelta, umbral, tope = 0) {
   let p = puntos + puntosDelta;
   let pr = premios + premiosDelta;
   let generados = 0;
-  if (puntosDelta > 0 && umbral > 0) {
+  const enTecho = tope > 0 && pr >= tope;
+  if (enTecho && umbral > 0 && p >= umbral) {
+    p = umbral - 1; // congelado: ni convierte ni supera umbral - 1
+  } else if (puntosDelta > 0 && umbral > 0 && p >= umbral) {
     const n = Math.floor(p / umbral);
     if (n > 0) {
       generados = n;
@@ -49,6 +60,7 @@ export function simularSaldo(puntos, premios, puntosDelta, premiosDelta, umbral)
       pr += n;
     }
   }
+  if (tope > 0 && pr > tope) pr = tope;
   return { puntos: p, premios: pr, generados };
 }
 

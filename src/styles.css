@@ -84,6 +84,9 @@ code { background: #eef2f7; padding: 1px 5px; border-radius: 5px; font-size: 12.
   cursor: pointer;
 }
 .btn-grande:hover { background: var(--acento-osc); }
+/* v1.11: botones de sumar bloqueados en el tope de puntos */
+.btn-grande:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-grande:disabled:hover { background: var(--acento); }
 
 /* ───────────────────────── Formularios ───────────────────────── */
 .form { display: flex; flex-direction: column; gap: 12px; }
@@ -204,6 +207,8 @@ textarea.input { min-height: 92px; resize: vertical; line-height: 1.45; }
 }
 .badge-ok { background: var(--ok-fondo); color: var(--ok); }
 .badge-mal { background: var(--mal-fondo); color: var(--mal); }
+/* v1.11: tarjeta en tope de puntos */
+.badge-aviso { background: #fff4e0; color: #a86a12; }
 
 /* ───────────────────────── Login ───────────────────────── */
 .pagina-login {
@@ -309,6 +314,9 @@ textarea.input { min-height: 92px; resize: vertical; line-height: 1.45; }
   color: var(--texto);
 }
 .chip:hover { background: #e6edf8; text-decoration: none; }
+/* v1.11: tarjeta en tope (puntos y premios congelados) */
+.chip-tope { background: #fff4e0; border-color: #e6a23c; font-weight: 600; }
+.chip-tope:hover { background: #ffe9c7; }
 .mini-tarjeta {
   border: 1px solid var(--borde);
   border-radius: 10px;

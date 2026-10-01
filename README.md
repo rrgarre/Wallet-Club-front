@@ -109,9 +109,9 @@ pestaña *Comercio* con su nombre de usuario y su contraseña de operario, y el
 ### Comercio
 | Ruta | Contenido |
 |---|---|
-| `/comercio` | Login **por `nombreUsuario` + contraseña** (v1.8: ya no sirve el `idRandomLargo`) + perfil del comercio (muestra su `nombreUsuario` y su **techo de premios**, v1.10) + su lista de tarjetas + **botones de acceso rápido** a *Escanear QR* y *Capturar puntos*. Un operario que llegue aquí se redirige a su lector |
+| `/comercio` | Login **por `nombreUsuario` + contraseña** (v1.8: ya no sirve el `idRandomLargo`) + perfil del comercio (muestra su `nombreUsuario` y su **techo de premios**, v1.10) + su lista de tarjetas (**distintivo «Tope»** en las congeladas, v1.11) + **botones de acceso rápido** a *Escanear QR* y *Capturar puntos*. Un operario que llegue aquí se redirige a su lector |
 | `/comercio/escanear` | **Lector de QR de tarjeta** (pide login de comercio u operario si hace falta). Para el operario se ocultan los accesos al panel (*Mi comercio*, selector de tarjetas): sólo escanea o escribe el número |
-| `/comercio/captura/:codigo` | **Captura de puntos.** `:codigo` es el id de la tarjeta; también vale `/comercio/captura?tarjeta=<id>`. Sin código, muestra el selector de tarjetas (operario: se le manda al lector). Se tolera el `403 FORBIDDEN_ROLE` del perfil (el operario no lo lee): la pantalla sigue funcionando sin umbral local. **Techo de premios (v1.10)**: sale de `maximoPremios` de la propia tarjeta (§5.3, legible también por el operario), se muestra siempre, avisa **sin bloquear** cuando el movimiento llegaría al techo y, al confirmar, **un modal resume la operación** (canjes resaltados) antes de enviar |
+| `/comercio/captura/:codigo` | **Captura de puntos.** `:codigo` es el id de la tarjeta; también vale `/comercio/captura?tarjeta=<id>`. Sin código, muestra el selector de tarjetas (operario: se le manda al lector; las tarjetas **en tope** salen marcadas 🔒). Se tolera el `403 FORBIDDEN_ROLE` del perfil (el operario no lo lee). **Techo y tope (v1.10/v1.11)**: `puntosPremio` + `maximoPremios` salen de la propia tarjeta (§5.3, legible también por el operario) y se refrescan con §5.4; el techo se muestra siempre y **corta los incrementos** para no proponer lo que el servidor no aplicaría, y al confirmar **un modal resume la operación** (canjes resaltados) antes de enviar. Con los premios en el techo y los puntos en `puntosPremio − 1` la tarjeta está **en tope**: los contadores se congelan, el contador de puntos dice cuántos faltaban y **hay que confirmar el modal «Tope de premios alcanzado»** |
 | `/comercio/password` | **Cambio de contraseña del comercio** (`PATCH /api/comercio/password`, §5.5): actual + nueva (mínimo 8) + repetición. Errores traducidos: `PASSWORD_ACTUAL_INCORRECTA`, `PASSWORDS_IGUALES` (v1.9), `VALIDATION`, `COMERCIO_INACTIVO`. Pide login de comercio |
 | `/comercio/operario-password` | **Cambio de la contraseña de operario/camarero** (`PATCH /api/comercio/operario-password`, §5.6, v1.9): *tu contraseña de comercio* (la que garantía el cambio; **nunca** se pide la de operario) + nueva de operario ×2. Pre-aviso si la nueva es igual a la tuya (`PASSWORDS_IGUALES`) y aviso de que la anterior deja de valer al instante. Sólo rol comercio (`ExigirRol`; el operario, `403 FORBIDDEN_ROLE`) |
 
@@ -147,9 +147,12 @@ La API no expone el histórico de operaciones al comercio, sólo al admin.
   flota sin empujar la fila.
 - **Fila 2 · Premio**: `Canjear` (sólo visible si hay premios) y «Más opciones»
   con `+1/−1 premio` y cantidad N para añadir/restar.
-- **Nunca negativos**: al llegar a 0 desaparecen los botones de resta
-  (`−1`, `Canjear`, `−1 premio`, `Restar`) y la resta numérica se bloquea si
-  supera lo disponible — el contrato rechaza saldos negativos.
+- **Nunca negativos y nunca imposibles**: al llegar a 0 desaparecen los
+  botones de resta (`−1`, `Canjear`, `−1 premio`, `Restar`) y la resta
+  numérica se bloquea si supera lo disponible — el contrato rechaza saldos
+  negativos. Del mismo modo **no se puede proponer subir por encima del
+  techo** ni, con los premios en el techo, pasar de `puntosPremio − 1`
+  (v1.11): esos botones quedan desactivados.
 - **Los desplegables «Más opciones» se cierran al pulsar fuera** (y con Escape).
 - **Consumiciones**: barra siempre visible en la tarjeta azul — cada punto
   sumado y cada premio canjeado suma 1 (`3 por puntos + 1 por canje = 4
@@ -167,15 +170,32 @@ La API no expone el histórico de operaciones al comercio, sólo al admin.
   reenvío tras `CODIGO_CAMARERO_REQUERIDO` (misma operación, mismo resumen).
 - **Techo de premios (v1.10)**: la tarjeta trae `maximoPremios` (§5.3 —
   funciona también para el operario, que no lee el perfil) y la respuesta
-  del movimiento lo refresca (§5.4). `0` = sin límite. Se muestra en la
-  tarjeta azul («Techo de premios: N…») y, si el movimiento simulado lo
-  supera, sale un **aviso naranja no bloqueante**: cuántos premios se
-  perderían y que lo canjees antes — **el envío se permite igual**, que el
-  servidor recortará.
-- **Recorte silencioso detectado**: el contrato no envía indicador del
-  recorte, así que al volver el `201` se comparan los premios previstos con
-  `tarjeta.premios`: si salieron menos, el aviso final pasa a naranja y
-  dice cuántos se han perdido.
+  del movimiento refresca `maximoPremios` **y `puntosPremio`** (§5.4). `0` =
+  sin límite. Se muestra en la tarjeta azul («Techo de premios: N…»).
+- **Tope de puntos (v1.11)**: el estado «en tope» es
+  `premios == maximoPremios` **y** `puntos == puntosPremio − 1`. Con los
+  premios en el techo:
+  - el contador de **Puntos** informa de **cuántos faltaban** para el tope
+    («faltan N puntos para el tope (máx. umbral − 1)») y, ya en el tope,
+    «TOPE: congelado en N»;
+  - **no deja de subir ni puntos ni premios**: `+1`, *Sumar N*, `+1 premio*
+    y *Añadir N* se desactivan y el buffer se limita a lo que aplicaría el
+    servidor, porque ese `201` **no movería los saldos** (quedaría registrado
+    en el libro sin efecto);
+  - **las restas y «Canjear» siguen vivas**: bajar premios por debajo del
+    techo es lo único que descongela la tarjeta;
+  - **modal «Tope de premios alcanzado» (hay que confirmarlo)**: sale al
+    cargar una tarjeta que ya está en tope y cada vez que un movimiento la
+    deja así — una sola vez por entrada, hasta que se salga y se vuelva a
+    entrar;
+  - en el **modal de revisión** se repite el aviso de techo, incluido el
+    «al enviar quedará EN TOPE».
+- **Avisos de techo (v1.10/v1.11)**: naranjas y **no bloquean el envío**. Si
+  la tarjeta está por encima del techo (p. ej. el admin lo bajó) se avisa de
+  que al enviar se igualará; al volver el `201` se deduce lo que el servidor
+  hizo en silencio comparando el saldo previo con `tarjeta`: «operación sin
+  efecto» (subida absorbida en tope), «ha igualado los premios al techo» o
+  «ha quedado EN TOPE».
 - **Conversión sólo visual**: el contador resta los puntos del umbral y suma el
   premio como hará el servidor… pero **el servidor es el que lo calcula de
   verdad**; el estado definitivo se lee de `tarjeta` de la respuesta (y de
@@ -278,13 +298,23 @@ llegar al login desde `/comercio/captura/3` vuelve a esa pantalla).
 - **Techo de premios (v1.10)**: `maximoPremios` es un entero ≥ 0 donde
   **`0` = sin límite**; se da de alta y se edita en `/admin/comercios`
   (validado en cliente: entero ≥ 0) y se muestra en el panel del comercio
-  y en la captura. Si una operación lo supera, **el front avisa** (aviso
-  naranja + repetición en el modal) **pero deja enviar**: el contrato dice
-  que el servidor **recorta en silencio** en esa misma operación y devuelve
-  `tarjeta.premios` ya recortado **sin indicador** — por eso el front
-  compara lo previsto con lo devuelto y avisa del recorte *a posteriori*.
-  El techo se lee de `GET /api/comercio/tarjetas/:id` (§5.3) porque esa
-  ruta también la puede leer el **operario** (el perfil, no).
+  y en la captura. Techo y umbral se leen de
+  `GET /api/comercio/tarjetas/:id` (§5.3), una ruta que también puede leer
+  el **operario** (el perfil, no), y la respuesta del movimiento los
+  refresca (`puntosPremio` + `maximoPremios`, §5.4).
+- **Tope de puntos (v1.11)**: con `premios == maximoPremios` y
+  `puntos == puntosPremio − 1` los contadores quedan **congelados** (§6.8).
+  El front **corta los incrementos** y **capa el buffer** a lo que el
+  servidor aplicaría, para no mandar subidas que se absorberían en silencio
+  y acabarían en el libro de operaciones sin efecto. La simulación es
+  **techo-consciente** (`simularSaldo(…, tope)`): con los premios en el
+  techo los puntos no convierten y no pasan de `umbral − 1`, y los premios
+  jamás se quedan por encima del techo — así contadores, «🎉 +N» y el
+  resumen cuadran con el `201`. **Los envíos que restan no se bloquean
+  nunca** (son los que descongelan). Los estados se calculan en el propio
+  cliente con `puntosPremio`/`maximoPremios` de §5.3 + saldos de la tarjeta
+  (en el panel y el selector: perfil §5.1 + listado §5.2) — **no hizo
+  falta ningún campo nuevo en el contrato**.
 - **Confirmar = revisar** (v1.10): en la captura, el botón *Confirmar* abre
   un **modal con el resumen** de la operación (destacando los canjes) y
   sólo la aceptación envía. Cancelar vuelve a la edición **sin pérdida**

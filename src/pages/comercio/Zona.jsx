@@ -227,7 +227,17 @@ function Panel() {
                           <td>{t.email}</td>
                           <td className="der num">{t.puntos}</td>
                           <td className="der num">{t.premios}</td>
-                          <td>{t.activo === 1 ? <Badge tono="ok">Activa</Badge> : <Badge tono="mal">Inactiva</Badge>}</td>
+                          <td>
+                            {t.activo === 1 ? <Badge tono="ok">Activa</Badge> : <Badge tono="mal">Inactiva</Badge>}
+                            {/* v1.11: tope = premios en el techo y puntos en umbral − 1
+                                (perfil §5.1 + saldos §5.2: no hace falta pedirlo al API) */}
+                            {Number(perfil?.maximoPremios) > 0 &&
+                              Number(perfil?.puntosPremio) > 0 &&
+                              t.premios >= Number(perfil.maximoPremios) &&
+                              t.puntos >= Number(perfil.puntosPremio) - 1 && (
+                                <Badge tono="aviso">Tope</Badge>
+                              )}
+                          </td>
                           <td>
                             <Link className="btn btn-mini" to={`/comercio/captura/${t.id}`}>
                               Capturar
