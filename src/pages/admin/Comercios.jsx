@@ -190,6 +190,14 @@ function FormComercio({ valor, onCerrar, onGuardar }) {
       setEnviando(false);
       return;
     }
+    // v1.9 PASSWORDS_IGUALES: si las dos que vas a enviar son la misma, el
+    // servidor las rechaza (el login probaría primero la de operario y el
+    // comercio perdería su panel). En edición sólo aplica si cambian las dos.
+    if (f.password && f.operarioPassword && f.password === f.operarioPassword) {
+      setError('La contraseña de comercio y la de operario no pueden ser iguales: elige una distinta.');
+      setEnviando(false);
+      return;
+    }
 
     const body = {};
     if (f.nombre && f.nombre !== valor.nombre) body.nombre = f.nombre;
@@ -216,7 +224,9 @@ function FormComercio({ valor, onCerrar, onGuardar }) {
           ? 'Ese nombre de usuario ya lo usa otro comercio: elige otro.'
           : err.code === 'COMERCIO_DUPLICADO'
             ? 'Ya existe un comercio con ese nombre.'
-            : err.message
+            : err.code === 'PASSWORDS_IGUALES'
+              ? 'La contraseña de comercio y la de operario no pueden ser iguales (v1.9): elige una distinta.'
+              : err.message
       );
       setEnviando(false);
       return;

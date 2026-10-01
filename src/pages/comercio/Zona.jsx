@@ -112,6 +112,9 @@ function Panel() {
               <Link className="acceso-grande secundario" to="/comercio/password">
                 <span className="acceso-icono">🔑</span> Cambiar contraseña
               </Link>
+              <Link className="acceso-grande secundario" to="/comercio/operario-password">
+                <span className="acceso-icono">🧑‍🍳</span> Cambiar contraseña de operario
+              </Link>
             </div>
 
             <div className="tarjeta">

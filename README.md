@@ -112,7 +112,8 @@ pestaña *Comercio* con su nombre de usuario y su contraseña de operario, y el
 | `/comercio` | Login **por `nombreUsuario` + contraseña** (v1.8: ya no sirve el `idRandomLargo`) + perfil del comercio (muestra su `nombreUsuario`) + su lista de tarjetas + **botones de acceso rápido** a *Escanear QR* y *Capturar puntos*. Un operario que llegue aquí se redirige a su lector |
 | `/comercio/escanear` | **Lector de QR de tarjeta** (pide login de comercio u operario si hace falta). Para el operario se ocultan los accesos al panel (*Mi comercio*, selector de tarjetas): sólo escanea o escribe el número |
 | `/comercio/captura/:codigo` | **Captura de puntos.** `:codigo` es el id de la tarjeta; también vale `/comercio/captura?tarjeta=<id>`. Sin código, muestra el selector de tarjetas (operario: se le manda al lector). Se tolera el `403 FORBIDDEN_ROLE` del perfil (el operario no lo lee): la pantalla sigue funcionando sin umbral local |
-| `/comercio/password` | **Cambio de contraseña del comercio** (`PATCH /api/comercio/password`, §5.5): actual + nueva (mínimo 8) + repetición. Errores traducidos: `PASSWORD_ACTUAL_INCORRECTA`, `VALIDATION`, `COMERCIO_INACTIVO`. Pide login de comercio |
+| `/comercio/password` | **Cambio de contraseña del comercio** (`PATCH /api/comercio/password`, §5.5): actual + nueva (mínimo 8) + repetición. Errores traducidos: `PASSWORD_ACTUAL_INCORRECTA`, `PASSWORDS_IGUALES` (v1.9), `VALIDATION`, `COMERCIO_INACTIVO`. Pide login de comercio |
+| `/comercio/operario-password` | **Cambio de la contraseña de operario/camarero** (`PATCH /api/comercio/operario-password`, §5.6, v1.9): *tu contraseña de comercio* (la que garantía el cambio; **nunca** se pide la de operario) + nueva de operario ×2. Pre-aviso si la nueva es igual a la tuya (`PASSWORDS_IGUALES`) y aviso de que la anterior deja de valer al instante. Sólo rol comercio (`ExigirRol`; el operario, `403 FORBIDDEN_ROLE`) |
 
 La API no expone el histórico de operaciones al comercio, sólo al admin.
 
@@ -219,6 +220,13 @@ llegar al login desde `/comercio/captura/3` vuelve a esa pantalla).
   redirige a `/comercio/escanear` si aterriza en `/comercio`.
 - `ExigirRol` acepta `rol` (uno) o `roles` (varios); la captura usa
   `roles={['comercio', 'operario']}`.
+- **Contraseñas (v1.9)**: el comercio cambia la suya en `/comercio/password`
+  (§5.5) y la de su operario en **`/comercio/operario-password`** (§5.6,
+  con `passwordActual` = *su* contraseña). El operario **no cambia ninguna**:
+  ambas rutas están tras `ExigirRol rol="comercio"` y el servidor responde
+  `403 FORBIDDEN_ROLE`. Regla común: la de comercio y la de operario nunca
+  pueden ser iguales (`400 PASSWORDS_IGUALES`) — si lo fueran, el login sólo
+  daría rol operario.
 
 ---
 
@@ -227,8 +235,9 @@ llegar al login desde `/comercio/captura/3` vuelve a esa pantalla).
 - No existen DELETE, edición de tarjetas, reset de contraseñas por email,
   logout en servidor ni registro de admins: esas acciones **no están
   implementadas**. El cambio de contraseña **del comercio** sí está
-  (§5.5 → `/comercio/password`); el admin restablece la de otros —incluida la
-  de operario (§7.4 `operarioPassword`)— desde `/admin/comercios`.
+  (§5.5 → `/comercio/password`) y **también el de la de operario** (§5.6 →
+  `/comercio/operario-password`, v1.9); además, el admin restablece cualquiera
+  de las dos desde `/admin/comercios` (§7.4 `password` / `operarioPassword`).
 - **Alta de tarjeta sin contraseña (v1.6)**: el formulario sólo envía
   `nombre` y `email`. La contraseña la fija el servidor
   (`USUARIO_PASSWORD`), así que el login de `/tarjeta` sigue implementado
